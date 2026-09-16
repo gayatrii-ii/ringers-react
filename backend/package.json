@@ -8,7 +8,8 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "lint": "tsc --noEmit",
-    "test:auth": "tsx scripts/test-auth-flow.ts"
+    "test:auth": "tsx scripts/test-auth-flow.ts",
+    "test:catalog": "tsx scripts/test-vendor-catalog-flow.ts"
   },
   "keywords": [
     "ringers",

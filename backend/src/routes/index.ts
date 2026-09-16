@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes.js';
+import vendorRoutes from './vendor.routes.js';
+import categoryRoutes from './category.routes.js';
+import productRoutes from './product.routes.js';
 
 const apiRouter = Router();
 
@@ -14,5 +17,8 @@ apiRouter.get('/health', (_req, res) => {
 
 // Mount Module Routes
 apiRouter.use('/auth', authRoutes);
+apiRouter.use('/vendors', vendorRoutes);
+apiRouter.use('/categories', categoryRoutes);
+apiRouter.use('/products', productRoutes);
 
 export default apiRouter;
