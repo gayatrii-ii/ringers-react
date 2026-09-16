@@ -220,4 +220,39 @@ export class VendorController {
       next(error);
     }
   }
+
+  /**
+   * GET /api/v1/vendors/profile/me/payment-settings
+   */
+  public static async getPaymentSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const vendorId = await VendorController.resolveVendorIdForUser(req);
+      const settings = await VendorService.getPaymentSettings(vendorId);
+      res.status(200).json({
+        success: true,
+        data: settings,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PUT /api/v1/vendors/profile/me/payment-settings
+   */
+  public static async updatePaymentSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const vendorId = await VendorController.resolveVendorIdForUser(req);
+      const { upiId, upiQrUrl, upiPayUrl } = req.body;
+      const settings = await VendorService.updatePaymentSettings(vendorId, { upiId, upiQrUrl, upiPayUrl });
+      res.status(200).json({
+        success: true,
+        message: 'Payment settings updated successfully.',
+        data: settings,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

@@ -3,6 +3,8 @@ import authRoutes from './auth.routes.js';
 import vendorRoutes from './vendor.routes.js';
 import categoryRoutes from './category.routes.js';
 import productRoutes from './product.routes.js';
+import adminRoutes from './admin.routes.js';
+import publicRoutes from './public.routes.js';
 
 const apiRouter = Router();
 
@@ -20,5 +22,8 @@ apiRouter.use('/auth', authRoutes);
 apiRouter.use('/vendors', vendorRoutes);
 apiRouter.use('/categories', categoryRoutes);
 apiRouter.use('/products', productRoutes);
+apiRouter.use('/admin', adminRoutes);
+apiRouter.use('/public', publicRoutes);
 
 export default apiRouter;
+
