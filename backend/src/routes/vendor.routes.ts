@@ -11,6 +11,7 @@ import {
   updateVendorAddressSchema,
   addVendorStaffSchema,
   vendorQuerySchema,
+  updateVendorPaymentSettingsSchema,
 } from '../modules/vendors/vendor.validation.js';
 
 const router = Router();
@@ -77,6 +78,24 @@ router.delete(
   authenticateToken,
   requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
   VendorController.removeStaff
+);
+
+// ==========================================
+// UPI Payment Settings
+// ==========================================
+router.get(
+  '/profile/me/payment-settings',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  VendorController.getPaymentSettings
+);
+
+router.put(
+  '/profile/me/payment-settings',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(updateVendorPaymentSettingsSchema),
+  VendorController.updatePaymentSettings
 );
 
 // ==========================================

@@ -68,3 +68,13 @@ export type CreateVendorAddressInput = z.infer<typeof createVendorAddressSchema>
 export type UpdateVendorAddressInput = z.infer<typeof updateVendorAddressSchema>['body'];
 export type AddVendorStaffInput = z.infer<typeof addVendorStaffSchema>['body'];
 export type VendorQueryInput = NonNullable<z.infer<typeof vendorQuerySchema>['query']>;
+
+export const updateVendorPaymentSettingsSchema = z.object({
+  body: z.object({
+    upiId: z.string().min(3, 'UPI ID must be at least 3 characters').max(100).optional(),
+    upiQrUrl: z.string().url('Invalid UPI QR code URL format').optional(),
+    upiPayUrl: z.string().max(500).optional(),
+  }),
+});
+
+export type UpdateVendorPaymentSettingsInput = z.infer<typeof updateVendorPaymentSettingsSchema>['body'];

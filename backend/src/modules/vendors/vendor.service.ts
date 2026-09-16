@@ -452,4 +452,82 @@ export class VendorService {
       throw new AppError('Staff member not found for this vendor.', 404, 'STAFF_NOT_FOUND');
     }
   }
+
+  /**
+   * Get UPI payment settings for a vendor store
+   */
+  public static async getPaymentSettings(vendorId: string): Promise<{
+    upiId: string | null;
+    upiQrUrl: string | null;
+    upiPayUrl: string | null;
+  }> {
+    const res = await query<{ upi_id: string | null; upi_qr_url: string | null; upi_pay_url: string | null }>(
+      `SELECT upi_id, upi_qr_url, upi_pay_url FROM vendor.vendors WHERE id = $1 AND deleted_at IS NULL`,
+      [vendorId]
+    );
+
+    const vendor = res.rows[0];
+    if (!vendor) {
+      throw new AppError('Vendor not found.', 404, 'VENDOR_NOT_FOUND');
+    }
+
+    return {
+      upiId: vendor.upi_id,
+      upiQrUrl: vendor.upi_qr_url,
+      upiPayUrl: vendor.upi_pay_url,
+    };
+  }
+
+  /**
+   * Update UPI payment settings for a vendor store
+   * Strictly scoped: only the owning vendor or super admin may call this.
+   */
+  public static async updatePaymentSettings(
+    vendorId: string,
+    data: { upiId?: string; upiQrUrl?: string; upiPayUrl?: string }
+  ): Promise<{ upiId: string | null; upiQrUrl: string | null; upiPayUrl: string | null }> {
+    const setParts: string[] = [];
+    const values: unknown[] = [];
+    let paramIdx = 1;
+
+    if (data.upiId !== undefined) {
+      setParts.push(`upi_id = $${paramIdx++}`);
+      values.push(data.upiId.trim() || null);
+    }
+    if (data.upiQrUrl !== undefined) {
+      setParts.push(`upi_qr_url = $${paramIdx++}`);
+      values.push(data.upiQrUrl.trim() || null);
+    }
+    if (data.upiPayUrl !== undefined) {
+      setParts.push(`upi_pay_url = $${paramIdx++}`);
+      values.push(data.upiPayUrl.trim() || null);
+    }
+
+    if (setParts.length === 0) {
+      throw new AppError('No payment settings fields provided to update.', 400, 'NOTHING_TO_UPDATE');
+    }
+
+    setParts.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(vendorId);
+
+    const res = await query<{ upi_id: string | null; upi_qr_url: string | null; upi_pay_url: string | null }>(
+      `UPDATE vendor.vendors
+       SET ${setParts.join(', ')}
+       WHERE id = $${paramIdx} AND deleted_at IS NULL
+       RETURNING upi_id, upi_qr_url, upi_pay_url`,
+      values
+    );
+
+    if (!res.rows[0]) {
+      throw new AppError('Vendor not found or update failed.', 404, 'VENDOR_NOT_FOUND');
+    }
+
+    const updated = res.rows[0];
+    return {
+      upiId: updated.upi_id,
+      upiQrUrl: updated.upi_qr_url,
+      upiPayUrl: updated.upi_pay_url,
+    };
+  }
 }
+
