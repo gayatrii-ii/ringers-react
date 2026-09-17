@@ -10,7 +10,8 @@
     "lint": "tsc --noEmit",
     "test:auth": "tsx scripts/test-auth-flow.ts",
     "test:catalog": "tsx scripts/test-vendor-catalog-flow.ts",
-    "test:admin": "tsx scripts/test-admin-governance-flow.ts"
+    "test:admin": "tsx scripts/test-admin-governance-flow.ts",
+    "test:customer-delivery": "tsx scripts/test-customer-delivery-flow.ts"
   },
   "keywords": [
     "ringers",
