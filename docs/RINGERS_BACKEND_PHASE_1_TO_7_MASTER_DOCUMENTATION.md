@@ -28,7 +28,7 @@
    - [Firebase Cloud Messaging (FCM) Service Account](#2-firebase-cloud-messaging-fcm-service-account)
    - [Transactional Email Gateway (SendGrid / AWS SES / Gmail)](#3-transactional-email-gateway)
    - [SMS Gateway (Twilio / Fast2SMS)](#4-sms-gateway)
-   - [Google Maps Platform API Key](#5-google-maps-platform-api-key)
+   - [Free Map Services Configuration](#5-free-map-services-configuration)
    - [Cloudinary Media Storage](#6-cloudinary-media-storage)
    - [PostgreSQL Production Database & JWT Secrets](#7-postgresql-production-database--jwt-secrets)
    - [Step-by-Step Guide to Updating `.env` & Dependent Backend Files](#8-step-by-step-guide-to-updating-env--dependent-backend-files)
@@ -597,28 +597,25 @@ Used for instant mobile OTP verification and driver dispatch SMS alerts.
 
 ---
 
-### 5. Google Maps Platform API Key
+### 5. Free Map Services Configuration
 
-Used for distance calculation fallback, address autocompletion, and visual rider tracking.
+Used for distance calculation, address geocoding, and visual rider tracking. We use 100% free, open-source alternatives.
 
-- **Website / Portal:** [https://console.cloud.google.com/](https://console.cloud.google.com/)
+- **Providers:** OpenStreetMap (OSM), Nominatim, and OSRM/OpenRouteService
 - **Target Variables:**
   ```env
-  GOOGLE_MAPS_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+  MAP_SERVICE_PROVIDER=openstreetmap
+  OSM_TILE_SERVER_URL=https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
+  OSM_NOMINATIM_URL=https://nominatim.openstreetmap.org
+  OSRM_ROUTING_URL=https://router.project-osrm.org
+  OPENROUTESERVICE_API_KEY=
   ```
 
-#### Step-by-Step Instructions:
-1. Open [Google Cloud Console](https://console.cloud.google.com/) and create a project named `Ringers-Maps`.
-2. Link a billing account.
-3. In the search bar, search for and **ENABLE** the following 3 APIs:
-   - **Places API (New)**
-   - **Geocoding API**
-   - **Distance Matrix API**
-4. Go to **APIs & Services** → **Credentials**.
-5. Click **Create Credentials** → select **API key**.
-6. Click **Edit API key** to restrict it:
-   - Under *API restrictions*, select *Restrict key* and check only the 3 enabled APIs above.
-7. Copy the key string → paste into `GOOGLE_MAPS_API_KEY`.
+#### Setup & Usage:
+1. **OSM Tile Server:** Used for frontend map rendering. URL is free and requires no API key.
+2. **Nominatim:** Used for address-to-GPS geocoding. 100% free; requires setting a generic User-Agent header in the app.
+3. **OSRM:** Open Source Routing Machine demo server calculates driving distance matrices for free.
+4. *(Optional)* **OpenRouteService:** If you exceed OSRM demo limits, sign up at [https://openrouteservice.org/](https://openrouteservice.org/) to get a free API key (2,000 req/day). Paste it into `OPENROUTESERVICE_API_KEY`.
 
 ---
 
@@ -754,7 +751,7 @@ ringers-react/
   3. **Delivery Navigation & Order Flow:**
      - Step 1: Navigate to Vendor Store → Click "Arrived at Store".
      - Step 2: Pickup items → Click "Order Picked Up" (transitions status to `OUT_FOR_DELIVERY`).
-     - Step 3: Navigate to Customer Address with Google Maps deep-link navigation.
+     - Step 3: Navigate to Customer Address with standard GPS geo deep-link navigation (OsmAnd, Waze, etc).
      - Step 4: Handover package → Enter customer 4-digit OTP → Click "Order Delivered" (triggers vendor wallet payout).
   4. **Live Background GPS Beacon:** Reports coordinates every 10 seconds to `/api/v1/delivery/location` so customers can track rider position.
   5. **Rider Earnings & Trip History:** Daily completed delivery tally, total earnings, and tips.
