@@ -8,6 +8,7 @@ import publicRoutes from './public.routes.js';
 import customerRoutes from './customer.routes.js';
 import deliveryRoutes from './delivery.routes.js';
 import orderRoutes from './order.routes.js';
+import paymentRoutes, { walletRouter } from './payment.routes.js';
 
 const apiRouter = Router();
 
@@ -30,6 +31,8 @@ apiRouter.use('/public', publicRoutes);
 apiRouter.use('/customers', customerRoutes);
 apiRouter.use('/delivery', deliveryRoutes);
 apiRouter.use('/orders', orderRoutes);
+apiRouter.use('/payments', paymentRoutes);
+apiRouter.use('/wallet', walletRouter);
 
 export default apiRouter;
 

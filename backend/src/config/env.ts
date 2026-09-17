@@ -28,6 +28,11 @@ const envSchema = z.object({
   // Super Admin Fallback / Seed Credentials
   SUPER_ADMIN_EMAIL: z.string().email().default('superadmin@ringer.com'),
   SUPER_ADMIN_PASSWORD: z.string().default('SuperAdmin@123!'),
+
+  // Razorpay Payment Gateway (optional in dev/test, required in production)
+  RAZORPAY_KEY_ID: z.string().optional().default(''),
+  RAZORPAY_KEY_SECRET: z.string().optional().default(''),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional().default(''),
 });
 
 const parsedEnv = envSchema.safeParse(process.cwd() ? process.env : {});

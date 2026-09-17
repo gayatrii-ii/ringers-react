@@ -12,7 +12,8 @@
     "test:catalog": "tsx scripts/test-vendor-catalog-flow.ts",
     "test:admin": "tsx scripts/test-admin-governance-flow.ts",
     "test:customer-delivery": "tsx scripts/test-customer-delivery-flow.ts",
-    "test:order": "tsx scripts/test-order-flow.ts"
+    "test:order": "tsx scripts/test-order-flow.ts",
+    "test:payment": "tsx scripts/test-payment-flow.ts"
   },
   "keywords": [
     "ringers",

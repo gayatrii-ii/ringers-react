@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { query, withTransaction } from '../../config/database.js';
 import { AppError } from '../../middlewares/error.middleware.js';
 import { ROLES, RoleCode } from '../../constants/roles.js';
+import { WalletService } from '../payment/payment.service.js';
 
 export interface OrderItemInput {
   productId: string;
@@ -450,7 +451,7 @@ export class OrderService {
       CANCELLED: [],
     };
 
-    return await withTransaction(async (client) => {
+    const updatedOrder = await withTransaction(async (client) => {
       // 1. Fetch order with row-level lock
       const orderRes = await client.query(
         `SELECT o.*, v.owner_user_id AS vendor_owner_id
@@ -542,6 +543,15 @@ export class OrderService {
 
       return OrderService.mapOrderResponse(updatedOrderRes.rows[0]);
     });
+
+    // Auto-credit vendor wallet upon successful delivery (90% vendor payout)
+    if (newStatus === 'DELIVERED') {
+      WalletService.creditVendorOnDelivery(orderId).catch((err) => {
+        console.error(`[WalletService] Failed to credit vendor for order ${orderId}:`, err);
+      });
+    }
+
+    return updatedOrder;
   }
 
   /**

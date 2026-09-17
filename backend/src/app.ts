@@ -22,7 +22,14 @@ export function createApp(): Express {
   );
 
   // Body Parsing
-  app.use(express.json({ limit: '10mb' }));
+  app.use(
+    express.json({
+      limit: '10mb',
+      verify: (req: any, _res: Response, buf: Buffer) => {
+        req.rawBody = buf.toString('utf8');
+      },
+    })
+  );
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // Basic Request Logger for Dev Mode
