@@ -7,6 +7,7 @@ import adminRoutes from './admin.routes.js';
 import publicRoutes from './public.routes.js';
 import customerRoutes from './customer.routes.js';
 import deliveryRoutes from './delivery.routes.js';
+import orderRoutes from './order.routes.js';
 
 const apiRouter = Router();
 
@@ -28,6 +29,7 @@ apiRouter.use('/admin', adminRoutes);
 apiRouter.use('/public', publicRoutes);
 apiRouter.use('/customers', customerRoutes);
 apiRouter.use('/delivery', deliveryRoutes);
+apiRouter.use('/orders', orderRoutes);
 
 export default apiRouter;
 
