@@ -3,6 +3,8 @@ import { query, withTransaction } from '../../config/database.js';
 import { AppError } from '../../middlewares/error.middleware.js';
 import { ROLES, RoleCode } from '../../constants/roles.js';
 import { WalletService } from '../payment/payment.service.js';
+import { NotificationService } from '../notifications/notification.service.js';
+import { NotificationEvent } from '../notifications/notification.i18n.js';
 
 export interface OrderItemInput {
   productId: string;
@@ -425,7 +427,22 @@ export class OrderService {
         [order.id, customerId]
       );
 
-      return OrderService.mapOrderResponse(order, createdItems);
+      const mappedOrder = OrderService.mapOrderResponse(order, createdItems);
+
+      // Trigger asynchronous order placed notification
+      NotificationService.sendLocalizedNotification({
+        userId: customerId,
+        event: 'ORDER_PLACED',
+        params: {
+          orderNumber: mappedOrder.orderNumber,
+          vendorName: calculation.vendorName,
+          amount: String(mappedOrder.totalAmount),
+        },
+        referenceType: 'ORDER',
+        referenceId: mappedOrder.id,
+      }).catch((err) => console.error('[NotificationService] Order placed notify error:', err));
+
+      return mappedOrder;
     });
   }
 
@@ -549,6 +566,26 @@ export class OrderService {
       WalletService.creditVendorOnDelivery(orderId).catch((err) => {
         console.error(`[WalletService] Failed to credit vendor for order ${orderId}:`, err);
       });
+    }
+
+    // Dispatch asynchronous order status notification to customer
+    const eventMap: Record<string, NotificationEvent> = {
+      CONFIRMED: 'ORDER_CONFIRMED',
+      PREPARING: 'ORDER_PREPARING',
+      READY: 'ORDER_READY',
+      OUT_FOR_DELIVERY: 'ORDER_OUT_FOR_DELIVERY',
+      DELIVERED: 'ORDER_DELIVERED',
+      CANCELLED: 'ORDER_CANCELLED',
+    };
+    const notifEvent = eventMap[newStatus];
+    if (notifEvent) {
+      NotificationService.sendLocalizedNotification({
+        userId: updatedOrder.customerId,
+        event: notifEvent,
+        params: { orderNumber: updatedOrder.orderNumber, reason: reason || undefined },
+        referenceType: 'ORDER',
+        referenceId: updatedOrder.id,
+      }).catch((err) => console.error(`[NotificationService] Failed to send ${notifEvent} notification:`, err));
     }
 
     return updatedOrder;
