@@ -28,8 +28,9 @@
      - [8.5 Vendor Referral Program & Rewards](#85-vendor-referral-program--rewards)
      - [8.6 Support & Issue Ticket System](#86-support--issue-ticket-system)
      - [8.7 Migration V17: Schema Extensions & Indexes](#87-migration-v17-schema-extensions--indexes)
-5. [Complete Master API Reference (77+ Endpoints)](#5-complete-master-api-reference)
-6. [Automated Test Verification Report (329 / 329 Tests)](#6-automated-test-verification-report)
+     - [8.8 Production Readiness Gap Closures & Operational APIs](#88-production-readiness-gap-closures--operational-apis)
+5. [Complete Master API Reference (89+ Endpoints)](#5-complete-master-api-reference)
+6. [Automated Test Verification Report (382 / 382 Tests)](#6-automated-test-verification-report)
 7. [Git Branch & Merge History](#7-git-branch--merge-history)
 8. [Next Step 1: Production Environment Credentials Setup Guide](#8-next-step-1-production-environment-credentials-setup-guide)
    - [Razorpay Live Payment Gateway Keys & Webhooks](#1-razorpay-live-payment-gateway-keys--webhooks)
@@ -392,6 +393,27 @@ The platform supports two distinct customer onboarding channels tailored for loc
   7. `delivery.delivery_assignments`: Extended with `rejection_reason`, `failure_reason`, `failure_notes`, `rejected_at`, `failed_at`.
   8. `order_management.orders`: Extended `delivery_status` check constraint to include `ACCEPTED`.
 
+#### 8.8 Production Readiness Gap Closures & Operational APIs
+To ensure 100% full-stack and mobile client readiness, 7 targeted operational workflows were implemented and integrated:
+- **8.8.1 Self-Service Password Recovery & Management (`/api/v1/auth`):**
+  - `POST /auth/forgot-password`: Generates secure 4-digit SMS OTP with 5-minute expiry for password recovery.
+  - `POST /auth/reset-password`: Verifies OTP, updates password with bcrypt cost factor 12, and revokes all active refresh tokens.
+  - `PUT /auth/change-password`: Authenticated user verifies old password before applying new password.
+- **8.8.2 Vendor Active Delivery Fleet Roster (`/api/v1/vendors`):**
+  - `GET /vendors/delivery-boys`: Returns full list of active delivery boys in vendor's fleet with live duty status, vehicle, active orders count, and completed deliveries. Solves frontend order dispatch rider selection.
+  - `PATCH /vendors/delivery-boys/:riderId/status`: Allows vendor to toggle rider status (`ACTIVE`, `INACTIVE`, `SUSPENDED`).
+- **8.8.3 Delivery Partner Trip History & Deliveries List (`/api/v1/delivery`):**
+  - `GET /delivery/assignments`: Paginated delivery history for logged-in rider with status filtering (`ASSIGNED`, `ACCEPTED`, `PICKED_UP`, `DELIVERED`, `FAILED`).
+- **8.8.4 Persisted User Language Preference (`/api/v1/customers`):**
+  - `PATCH /customers/profile/language`: Persists user's chosen UI language (`EN`, `HI`, `MR`) in database for automatic localized SMS and push notifications. Also accepted in `PUT /customers/profile/me`.
+- **8.8.5 Customer Activity Dashboard & Quick Statistics (`/api/v1/customers`):**
+  - `GET /customers/profile/stats`: Single-roundtrip dashboard endpoint returning total orders, active in-transit orders, completed orders, cancelled orders, total spent (₹), wallet balance (₹), and saved addresses count.
+- **8.8.6 Account Self-Deactivation & Guardrails (`/api/v1/customers`):**
+  - `DELETE /customers/profile/me`: Soft-deletes user account (`deleted_at = CURRENT_TIMESTAMP`, `status = 'DEACTIVATED'`) and revokes tokens. Safely blocks deactivation if orders are currently in-progress.
+- **8.8.7 Vendor Analytical Sales Trends & Payment Breakdown (`/api/v1/analytics`):**
+  - `GET /analytics/vendor/sales-trend`: Daily/weekly sales time-series data for frontend revenue graph visualization.
+  - `GET /analytics/vendor/payment-breakdown`: Order volume and gross revenue distribution across Cash on Delivery, Razorpay Online, and Wallet.
+
 ---
 
 ## 5. Complete Master API Reference
@@ -405,8 +427,13 @@ The platform supports two distinct customer onboarding channels tailored for loc
 | `POST` | `/auth/register` | Public | Register standard Customer account |
 | `POST` | `/auth/register/vendor` | Public (Requires Key) | Register Vendor account using Super Admin Private Key |
 | `POST` | `/auth/login` | Public | Authenticate user; returns JWT Access Token + Refresh Token |
-| `POST` | `/auth/refresh` | Public | Rotate Refresh Token and receive new Access Token |
-| `POST` | `/auth/logout` | Authenticated | Invalidate active refresh token session |
+| `POST` | `/auth/send-otp` | Public | Generate and send cryptographic numeric OTP via SMS |
+| `POST` | `/auth/verify-otp` | Public | Verify OTP code with 5-attempt rate limiting |
+| `POST` | `/auth/forgot-password` | Public | Step 1 of password recovery: generate OTP for registered mobile |
+| `POST` | `/auth/reset-password` | Public | Step 2 of password recovery: verify OTP, hash new password (cost 12), revoke tokens |
+| `PUT` | `/auth/change-password` | Authenticated | Update password by verifying existing password hash |
+| `POST` | `/auth/refresh-token` | Public | Rotate Refresh Token and receive new Access Token |
+| `POST` | `/auth/logout` | Authenticated | Invalidate active refresh token session in database |
 | `GET` | `/auth/me` | Authenticated | Get current authenticated user details and active roles |
 
 ### 2. Vendor Management (`/api/v1/vendors`)
@@ -437,6 +464,8 @@ The platform supports two distinct customer onboarding channels tailored for loc
 | `PATCH`| `/vendors/:vendorId/catalog-restriction` | `VENDOR` | Toggle customer catalog restriction setting ON/OFF |
 | `GET` | `/vendors/delivery-boys/job-requests` | `VENDOR` | View delivery boy applications connected to vendor fleet |
 | `POST` | `/vendors/delivery-boys/activate` | `VENDOR` | Activate connected delivery boy account with login credentials |
+| `GET` | `/vendors/delivery-boys` | `VENDOR` | List all active/connected delivery partners in vendor fleet with duty & delivery metrics |
+| `PATCH`| `/vendors/delivery-boys/:riderId/status` | `VENDOR` | Toggle rider status (`ACTIVE`, `INACTIVE`, `SUSPENDED`) |
 | `GET` | `/vendors/referral` | `VENDOR` | Get vendor referral dashboard profile, metrics, and invite code |
 | `POST` | `/vendors/referrals/invite` | `VENDOR` | Invite prospective merchant via phone or email |
 | `GET` | `/vendors/referrals` | `VENDOR` | List all referrals dispatched by vendor |
@@ -484,6 +513,9 @@ The platform supports two distinct customer onboarding channels tailored for loc
 | `PUT` | `/customers/addresses/:id` | `CUSTOMER` | Update delivery address details |
 | `DELETE`| `/customers/addresses/:id` | `CUSTOMER` | Soft-delete address (auto-promotes next address if default) |
 | `PATCH`| `/customers/addresses/:id/default`| `CUSTOMER` | Designate address as primary delivery destination |
+| `PATCH`| `/customers/profile/language` | `CUSTOMER` | Update customer UI language preference (`EN`, `HI`, `MR`) |
+| `GET` | `/customers/profile/stats` | `CUSTOMER` | Get single-roundtrip customer activity summary dashboard |
+| `DELETE`| `/customers/profile/me` | `CUSTOMER` | Self-deactivate account (guarded against active orders) |
 
 ### 6. Delivery Fleet Management (`/api/v1/delivery`)
 | Method | Endpoint | Access / Role | Description |
@@ -491,6 +523,7 @@ The platform supports two distinct customer onboarding channels tailored for loc
 | `GET` | `/delivery/profile/me` | `DELIVERY_BOY` | View rider vehicle profile, license, and duty status |
 | `PUT` | `/delivery/profile/me` | `DELIVERY_BOY` | Update vehicle type, license number, and registration |
 | `PATCH`| `/delivery/duty-status` | `DELIVERY_BOY` | Toggle duty between `ONLINE`, `OFFLINE`, and `BUSY` |
+| `GET` | `/delivery/assignments` | `DELIVERY_BOY` | Paginated delivery assignment history with status filters |
 | `GET` | `/delivery/stats` | `DELIVERY_BOY` | View delivery count, active assignment, and metrics |
 | `POST` | `/delivery/assignments/:id/accept` | `DELIVERY_BOY` | Rider accepts delivery assignment (duty switches to BUSY) |
 | `POST` | `/delivery/assignments/:id/reject` | `DELIVERY_BOY` | Rider rejects assignment with reason (order returned to vendor) |
@@ -554,6 +587,8 @@ The platform supports two distinct customer onboarding channels tailored for loc
 | `GET` | `/analytics/admin/vendors-leaderboard`| `SUPER_ADMIN` | Top vendors ranked by sales revenue and orders |
 | `GET` | `/analytics/admin/delivery-performance`| `SUPER_ADMIN` | Fleet completion rates, average delivery minutes, top riders |
 | `GET` | `/analytics/vendor/overview` | `VENDOR` | Store GMV, net payout (90%), top 5 selling items, store rating |
+| `GET` | `/analytics/vendor/sales-trend` | `VENDOR` | Time-series sales trend (daily/weekly) for charting |
+| `GET` | `/analytics/vendor/payment-breakdown`| `VENDOR` | Payment method breakdown (Cash, Razorpay Online, Wallet) |
 
 
 ### 12. Support & Issue Tickets Module (`/api/v1/support`)
@@ -582,7 +617,8 @@ Every phase includes an automated end-to-end integration test suite located in `
 | **Phase 6** | Payment Gateway, Razorpay & Double-Entry Wallet | `test-payment-flow.ts` | **46 / 46** | ✅ PASS |
 | **Phase 7** | Notifications (i18n EN/HI/MR), Reviews & Analytics | `test-phase7-flow.ts` | **111 / 111** | ✅ PASS |
 | **Phase 8** | Customer Onboarding, Custom Pricing, Handover, Support | `test-phase8-flow.ts` | **78 / 78** | ✅ PASS |
-| **TOTAL** | **Full Platform Regression Suite (8 Phases)** | `npm run test:all` | **329 / 329** | **✅ 100% PASS** |
+| **Phase 8 (Gap Closures)** | Password Reset, Delivery Boy Fleet Roster, Stats, Analytics | `test-enhancements-flow.ts` | **53 / 53** | ✅ PASS |
+| **TOTAL** | **Full Platform Regression Suite (8 Phases + Enhancements)** | `npm run test:all` | **382 / 382** | **✅ 100% PASS** |
 
 - **TypeScript Strict Compile (`npx tsc --noEmit`):** `0 errors`
 - **Production Bundle Build (`npm run build`):** `dist/ generated cleanly with 0 errors`

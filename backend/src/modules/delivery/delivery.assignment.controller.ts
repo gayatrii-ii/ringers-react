@@ -252,4 +252,34 @@ export class DeliveryAssignmentController {
       next(error);
     }
   }
+
+  /**
+   * Rider: List Assigned Orders & Delivery History
+   */
+  public static async listMyAssignments(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const result = await DeliveryAssignmentService.listRiderAssignments(
+        user.userId,
+        req.query as any
+      );
+
+      res.status(200).json({
+        success: true,
+        data: result.assignments,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: Math.ceil(result.total / result.limit),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

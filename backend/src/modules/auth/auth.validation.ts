@@ -50,3 +50,36 @@ export const refreshTokenSchema = z.object({
     refreshToken: z.string().min(1, 'Refresh token is required'),
   }),
 });
+
+export const forgotPasswordSchema = z.object({
+  body: z.object({
+    phone: z
+      .string()
+      .trim()
+      .regex(/^[6-9]\d{9}$/, 'Invalid Indian mobile number (must be 10 digits starting with 6-9)'),
+  }),
+});
+
+export const resetPasswordSchema = z.object({
+  body: z.object({
+    phone: z
+      .string()
+      .trim()
+      .regex(/^[6-9]\d{9}$/, 'Invalid Indian mobile number (must be 10 digits starting with 6-9)'),
+    otp: z.string().trim().min(4, 'OTP must be at least 4 digits').max(6, 'OTP must be at most 6 digits'),
+    newPassword: z
+      .string()
+      .min(8, 'New password must be at least 8 characters')
+      .max(100, 'Password is too long'),
+  }),
+});
+
+export const changePasswordSchema = z.object({
+  body: z.object({
+    oldPassword: z.string().min(1, 'Current password is required'),
+    newPassword: z
+      .string()
+      .min(8, 'New password must be at least 8 characters')
+      .max(100, 'Password is too long'),
+  }),
+});

@@ -158,4 +158,65 @@ export class CustomerController {
       next(error);
     }
   }
+
+  /**
+   * PATCH /api/v1/customers/profile/language
+   */
+  public static async updateLanguage(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+      }
+
+      const { language } = req.body;
+      const result = await CustomerService.updateLanguage(req.user.userId, language);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: {
+          preferredLanguage: result.preferredLanguage,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/customers/profile/stats
+   */
+  public static async getStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+      }
+
+      const stats = await CustomerService.getDashboardStats(req.user.userId);
+      res.status(200).json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/v1/customers/profile/me
+   */
+  public static async deactivateAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+      }
+
+      const result = await CustomerService.deactivateAccount(req.user.userId);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

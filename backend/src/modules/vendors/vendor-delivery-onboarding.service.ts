@@ -203,4 +203,145 @@ export class VendorDeliveryOnboardingService {
       };
     });
   }
+
+  /**
+   * Vendor: List all active and connected delivery boys in vendor's fleet
+   */
+  public static async listVendorDeliveryBoys(
+    vendorUserId: string,
+    filters: { status?: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'; page?: number; limit?: number }
+  ): Promise<{
+    riders: Array<{
+      riderId: string;
+      fullName: string;
+      phone: string;
+      email: string | null;
+      accountStatus: string;
+      dutyStatus: string;
+      vehicleType: string;
+      licenseNumber: string | null;
+      activeDeliveries: number;
+      completedDeliveries: number;
+      activatedAt: Date;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const vendorId = await this.getVendorByOwnerId(vendorUserId);
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const offset = (page - 1) * limit;
+
+    const conditions: string[] = ['jr.assigned_vendor_id = $1', "jr.status = 'ACTIVATED'", 'u.deleted_at IS NULL'];
+    const params: unknown[] = [vendorId];
+    let pIdx = 2;
+
+    if (filters.status) {
+      conditions.push(`u.status = $${pIdx++}`);
+      params.push(filters.status);
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    // Total count
+    const countRes = await query<{ count: string }>(
+      `SELECT COUNT(DISTINCT u.id) AS count
+       FROM delivery.delivery_boy_job_requests jr
+       JOIN identity.users u ON u.id = jr.activated_user_id
+       WHERE ${whereClause}`,
+      params
+    );
+    const total = parseInt(countRes.rows[0]?.count || '0', 10);
+
+    // List riders with active/completed metrics
+    const dataRes = await query<{
+      rider_id: string;
+      first_name: string;
+      last_name: string;
+      phone: string;
+      email: string | null;
+      account_status: string;
+      duty_status: string | null;
+      vehicle_type: string | null;
+      license_number: string | null;
+      active_deliveries: string;
+      completed_deliveries: string;
+      activated_at: Date;
+    }>(
+      `SELECT 
+         u.id AS rider_id,
+         u.first_name,
+         u.last_name,
+         u.phone,
+         u.email,
+         u.status AS account_status,
+         dp.status AS duty_status,
+         dp.vehicle_type,
+         dp.license_number,
+         COUNT(da.id) FILTER (WHERE da.status IN ('ASSIGNED', 'ACCEPTED', 'PICKED_UP')) AS active_deliveries,
+         COUNT(da.id) FILTER (WHERE da.status = 'DELIVERED') AS completed_deliveries,
+         jr.updated_at AS activated_at
+       FROM delivery.delivery_boy_job_requests jr
+       JOIN identity.users u ON u.id = jr.activated_user_id
+       LEFT JOIN delivery.delivery_profiles dp ON dp.user_id = u.id
+       LEFT JOIN delivery.delivery_assignments da ON da.delivery_boy_id = u.id
+       WHERE ${whereClause}
+       GROUP BY u.id, u.first_name, u.last_name, u.phone, u.email, u.status, dp.status, dp.vehicle_type, dp.license_number, jr.updated_at
+       ORDER BY u.first_name ASC
+       LIMIT $${pIdx++} OFFSET $${pIdx++}`,
+      [...params, limit, offset]
+    );
+
+    const riders = dataRes.rows.map((row) => ({
+      riderId: row.rider_id,
+      fullName: `${row.first_name} ${row.last_name}`.trim(),
+      phone: row.phone,
+      email: row.email,
+      accountStatus: row.account_status,
+      dutyStatus: row.duty_status || 'OFFLINE',
+      vehicleType: row.vehicle_type || 'BIKE',
+      licenseNumber: row.license_number || null,
+      activeDeliveries: parseInt(row.active_deliveries || '0', 10),
+      completedDeliveries: parseInt(row.completed_deliveries || '0', 10),
+      activatedAt: row.activated_at,
+    }));
+
+    return { riders, total, page, limit };
+  }
+
+  /**
+   * Vendor: Toggle rider account status (ACTIVE / INACTIVE / SUSPENDED)
+   */
+  public static async updateVendorRiderStatus(
+    vendorUserId: string,
+    riderId: string,
+    status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
+  ): Promise<{ riderId: string; status: string; message: string }> {
+    const vendorId = await this.getVendorByOwnerId(vendorUserId);
+
+    // Verify this rider belongs to this vendor
+    const checkRes = await query<{ id: string }>(
+      `SELECT id FROM delivery.delivery_boy_job_requests 
+       WHERE assigned_vendor_id = $1 AND activated_user_id = $2`,
+      [vendorId, riderId]
+    );
+
+    if (checkRes.rows.length === 0) {
+      throw new AppError('Delivery rider not found or not registered under your store.', 404, 'RIDER_NOT_FOUND');
+    }
+
+    await query(
+      `UPDATE identity.users 
+       SET status = $1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $2`,
+      [status, riderId]
+    );
+
+    return {
+      riderId,
+      status,
+      message: `Delivery rider status updated to ${status} successfully.`,
+    };
+  }
 }

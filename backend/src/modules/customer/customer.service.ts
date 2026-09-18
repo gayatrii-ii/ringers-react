@@ -11,6 +11,7 @@ export interface CustomerProfileResponse {
   dateOfBirth: string | null;
   gender: string | null;
   profileImage: string | null;
+  preferredLanguage: 'EN' | 'HI' | 'MR';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +39,17 @@ export interface UpdateProfileInput {
   dateOfBirth?: string | null;
   gender?: 'MALE' | 'FEMALE' | 'OTHER' | 'PREFER_NOT_TO_SAY' | null;
   profileImage?: string | null;
+  preferredLanguage?: 'EN' | 'HI' | 'MR';
+}
+
+export interface CustomerStatsResponse {
+  totalOrders: number;
+  activeOrders: number;
+  completedOrders: number;
+  cancelledOrders: number;
+  totalSpent: number;
+  walletBalance: number;
+  savedAddressesCount: number;
 }
 
 export interface CreateAddressInput {
@@ -82,6 +94,7 @@ export class CustomerService {
          p.date_of_birth,
          p.gender,
          p.profile_image,
+         COALESCE(p.preferred_language, 'EN') AS preferred_language,
          COALESCE(p.created_at, u.created_at) AS created_at,
          COALESCE(p.updated_at, u.updated_at) AS updated_at
        FROM identity.users u
@@ -105,13 +118,14 @@ export class CustomerService {
       dateOfBirth: row.date_of_birth ? row.date_of_birth.toISOString?.().split('T')[0] || String(row.date_of_birth) : null,
       gender: row.gender || null,
       profileImage: row.profile_image || null,
+      preferredLanguage: (row.preferred_language as any) || 'EN',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
   }
 
   /**
-   * Update customer personal profile (first name, last name, DOB, gender, profile photo)
+   * Update customer personal profile (first name, last name, DOB, gender, profile photo, preferred language)
    */
   public static async updateProfile(userId: string, data: UpdateProfileInput): Promise<CustomerProfileResponse> {
     return await withTransaction(async (client) => {
@@ -143,20 +157,21 @@ export class CustomerService {
 
       // 2. Check if customer profile already exists
       const existingRes = await client.query(
-        `SELECT id, date_of_birth, gender, profile_image FROM customer.customer_profiles WHERE user_id = $1`,
+        `SELECT id, date_of_birth, gender, profile_image, preferred_language FROM customer.customer_profiles WHERE user_id = $1`,
         [userId]
       );
 
       if (existingRes.rows.length === 0) {
         // Insert new profile
         await client.query(
-          `INSERT INTO customer.customer_profiles (user_id, date_of_birth, gender, profile_image)
-           VALUES ($1, $2, $3, $4)`,
+          `INSERT INTO customer.customer_profiles (user_id, date_of_birth, gender, profile_image, preferred_language)
+           VALUES ($1, $2, $3, $4, $5)`,
           [
             userId,
             data.dateOfBirth || null,
             data.gender || null,
             data.profileImage || null,
+            data.preferredLanguage || 'EN',
           ]
         );
       } else {
@@ -176,6 +191,10 @@ export class CustomerService {
         if (data.profileImage !== undefined) {
           profUpdates.push(`profile_image = $${pIdx++}`);
           profParams.push(data.profileImage);
+        }
+        if (data.preferredLanguage !== undefined) {
+          profUpdates.push(`preferred_language = $${pIdx++}`);
+          profParams.push(data.preferredLanguage);
         }
 
         if (profUpdates.length > 0) {
@@ -203,6 +222,7 @@ export class CustomerService {
            p.date_of_birth,
            p.gender,
            p.profile_image,
+           COALESCE(p.preferred_language, 'EN') AS preferred_language,
            COALESCE(p.created_at, u.created_at) AS created_at,
            COALESCE(p.updated_at, u.updated_at) AS updated_at
          FROM identity.users u
@@ -222,10 +242,135 @@ export class CustomerService {
         dateOfBirth: row.date_of_birth ? row.date_of_birth.toISOString?.().split('T')[0] || String(row.date_of_birth) : null,
         gender: row.gender || null,
         profileImage: row.profile_image || null,
+        preferredLanguage: (row.preferred_language as any) || 'EN',
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       };
     });
+  }
+
+  /**
+   * Update customer preferred language (EN, HI, MR)
+   */
+  public static async updateLanguage(
+    userId: string,
+    language: 'EN' | 'HI' | 'MR'
+  ): Promise<{ preferredLanguage: 'EN' | 'HI' | 'MR'; message: string }> {
+    await withTransaction(async (client) => {
+      const existingRes = await client.query(
+        `SELECT id FROM customer.customer_profiles WHERE user_id = $1`,
+        [userId]
+      );
+
+      if (existingRes.rows.length === 0) {
+        await client.query(
+          `INSERT INTO customer.customer_profiles (user_id, preferred_language)
+           VALUES ($1, $2)`,
+          [userId, language]
+        );
+      } else {
+        await client.query(
+          `UPDATE customer.customer_profiles 
+           SET preferred_language = $1, updated_at = CURRENT_TIMESTAMP 
+           WHERE user_id = $2`,
+          [language, userId]
+        );
+      }
+    });
+
+    return {
+      preferredLanguage: language,
+      message: `Language preference set to ${language} successfully.`,
+    };
+  }
+
+  /**
+   * Customer: Get aggregate dashboard stats (orders, spend, wallet, saved addresses)
+   */
+  public static async getDashboardStats(userId: string): Promise<CustomerStatsResponse> {
+    const ordersRes = await query<{
+      total_orders: string;
+      active_orders: string;
+      completed_orders: string;
+      cancelled_orders: string;
+      total_spent: string;
+    }>(
+      `SELECT 
+         COUNT(*) AS total_orders,
+         COUNT(*) FILTER (WHERE status IN ('PLACED', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY')) AS active_orders,
+         COUNT(*) FILTER (WHERE status = 'DELIVERED') AS completed_orders,
+         COUNT(*) FILTER (WHERE status = 'CANCELLED') AS cancelled_orders,
+         COALESCE(SUM(total_amount) FILTER (WHERE status = 'DELIVERED'), 0) AS total_spent
+       FROM order_management.orders
+       WHERE customer_id = $1`,
+      [userId]
+    );
+
+    const o = ordersRes.rows[0];
+
+    // Wallet balance
+    const walletRes = await query<{ balance: string }>(
+      `SELECT balance FROM payment.wallets WHERE user_id = $1`,
+      [userId]
+    );
+
+    // Saved addresses count
+    const addrRes = await query<{ count: string }>(
+      `SELECT COUNT(*) AS count FROM customer.customer_addresses WHERE user_id = $1 AND deleted_at IS NULL`,
+      [userId]
+    );
+
+    return {
+      totalOrders: parseInt(o?.total_orders || '0', 10),
+      activeOrders: parseInt(o?.active_orders || '0', 10),
+      completedOrders: parseInt(o?.completed_orders || '0', 10),
+      cancelledOrders: parseInt(o?.cancelled_orders || '0', 10),
+      totalSpent: parseFloat(o?.total_spent || '0'),
+      walletBalance: parseFloat(walletRes.rows[0]?.balance || '0'),
+      savedAddressesCount: parseInt(addrRes.rows[0]?.count || '0', 10),
+    };
+  }
+
+  /**
+   * Customer: Soft-delete/deactivate account
+   */
+  public static async deactivateAccount(userId: string): Promise<{ message: string }> {
+    // 1. Check if any active orders exist in transit
+    const activeCheck = await query<{ count: string }>(
+      `SELECT COUNT(*) AS count
+       FROM order_management.orders
+       WHERE customer_id = $1 AND status NOT IN ('DELIVERED', 'CANCELLED')`,
+      [userId]
+    );
+
+    if (parseInt(activeCheck.rows[0]?.count || '0', 10) > 0) {
+      throw new AppError(
+        'Cannot deactivate account while you have active orders in progress. Please wait until they are delivered or cancel them.',
+        400,
+        'ACTIVE_ORDERS_IN_PROGRESS'
+      );
+    }
+
+    // 2. Soft-delete user and revoke refresh tokens
+    await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE identity.users 
+         SET status = 'DEACTIVATED', deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $1`,
+        [userId]
+      );
+
+      await client.query(
+        `UPDATE identity.refresh_tokens 
+         SET revoked_at = CURRENT_TIMESTAMP 
+         WHERE user_id = $1`,
+        [userId]
+      );
+    });
+
+    return {
+      message: 'Account deactivated successfully. All active sessions have been terminated.',
+    };
   }
 
   /**

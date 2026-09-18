@@ -52,4 +52,63 @@ export class VendorDeliveryOnboardingController {
       next(error);
     }
   }
+
+  /**
+   * Vendor: List all active and connected delivery partners in vendor's fleet
+   */
+  public static async listVendorDeliveryBoys(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const vendorUserId = (req as any).user.userId;
+      const result = await VendorDeliveryOnboardingService.listVendorDeliveryBoys(
+        vendorUserId,
+        req.query as any
+      );
+      res.status(200).json({
+        success: true,
+        data: result.riders,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: Math.ceil(result.total / result.limit),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Vendor: Update rider status (ACTIVE / INACTIVE / SUSPENDED)
+   */
+  public static async updateVendorRiderStatus(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const vendorUserId = (req as any).user.userId;
+      const { riderId } = req.params;
+      const { status } = req.body;
+      const result = await VendorDeliveryOnboardingService.updateVendorRiderStatus(
+        vendorUserId,
+        String(riderId),
+        status
+      );
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: {
+          riderId: result.riderId,
+          status: result.status,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

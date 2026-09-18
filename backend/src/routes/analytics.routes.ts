@@ -47,4 +47,20 @@ router.get(
   AnalyticsController.getVendorOverview
 );
 
+// 5. Vendor: Sales Revenue Trend (Daily / Weekly Time Series)
+router.get(
+  '/vendor/sales-trend',
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(vendorAnalyticsQuerySchema),
+  AnalyticsController.getVendorSalesTrend
+);
+
+// 6. Vendor: Payment Method Breakdown
+router.get(
+  '/vendor/payment-breakdown',
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(vendorAnalyticsQuerySchema),
+  AnalyticsController.getVendorPaymentBreakdown
+);
+
 export default router;

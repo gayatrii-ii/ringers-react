@@ -130,4 +130,56 @@ export class AuthController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/v1/auth/forgot-password
+   */
+  public static async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { phone } = req.body;
+      const result = await AuthService.forgotPassword(phone);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        expiresInSeconds: result.expiresInSeconds,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/auth/reset-password
+   */
+  public static async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { phone, otp, newPassword } = req.body;
+      const result = await AuthService.resetPassword(phone, otp, newPassword);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PUT /api/v1/auth/change-password (Requires Bearer token)
+   */
+  public static async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user?.userId) {
+        throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+      }
+      const { oldPassword, newPassword } = req.body;
+      const result = await AuthService.changePassword(req.user.userId, oldPassword, newPassword);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

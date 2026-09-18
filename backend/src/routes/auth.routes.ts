@@ -10,6 +10,9 @@ import {
   sendOtpSchema,
   verifyOtpSchema,
   refreshTokenSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
 } from '../modules/auth/auth.validation.js';
 
 const router = Router();
@@ -19,11 +22,14 @@ router.post('/login', validate(loginSchema), AuthController.login);
 router.post('/vendor/register', validate(vendorRegisterSchema), AuthController.registerVendor);
 router.post('/send-otp', validate(sendOtpSchema), AuthController.sendOtp);
 router.post('/verify-otp', validate(verifyOtpSchema), AuthController.verifyOtp);
+router.post('/forgot-password', validate(forgotPasswordSchema), AuthController.forgotPassword);
+router.post('/reset-password', validate(resetPasswordSchema), AuthController.resetPassword);
 router.post('/refresh-token', validate(refreshTokenSchema), AuthController.refreshToken);
 router.post('/logout', AuthController.logout);
 
 // Protected Auth Endpoints
 router.get('/me', authenticateToken, AuthController.getMe);
+router.put('/change-password', authenticateToken, validate(changePasswordSchema), AuthController.changePassword);
 
 // Role-Guard Demonstration / Verification Endpoints
 router.get(
