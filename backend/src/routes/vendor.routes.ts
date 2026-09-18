@@ -13,6 +13,30 @@ import {
   vendorQuerySchema,
   updateVendorPaymentSettingsSchema,
 } from '../modules/vendors/vendor.validation.js';
+import { CustomerOnboardingController } from '../modules/customer/customer-onboarding.controller.js';
+import {
+  vendorInitiateCustomerSchema,
+  verifyCustomerOtpSchema,
+  activateCustomerAccountSchema,
+  listRegistrationRequestsSchema,
+  rejectRegistrationRequestSchema,
+} from '../modules/customer/customer-onboarding.validation.js';
+import { CustomerPricingController } from '../modules/vendors/customer-pricing.controller.js';
+import {
+  customerPricingParamSchema,
+  updateCustomerProductsSchema,
+  toggleCatalogRestrictionSchema,
+} from '../modules/vendors/customer-pricing.validation.js';
+import { VendorDeliveryOnboardingController } from '../modules/vendors/vendor-delivery-onboarding.controller.js';
+import {
+  listVendorDeliveryRequestsSchema,
+  activateDeliveryBoySchema,
+} from '../modules/vendors/vendor-delivery-onboarding.validation.js';
+import { VendorReferralController } from '../modules/vendors/vendor-referral.controller.js';
+import {
+  inviteVendorSchema,
+  listReferralsSchema,
+} from '../modules/vendors/vendor-referral.validation.js';
 
 const router = Router();
 
@@ -96,6 +120,121 @@ router.put(
   requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
   validate(updateVendorPaymentSettingsSchema),
   VendorController.updatePaymentSettings
+);
+
+// ==========================================
+// 1b. Customer Onboarding & Registration (Flow A & Flow B)
+// ==========================================
+router.post(
+  '/customers/register',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(vendorInitiateCustomerSchema),
+  CustomerOnboardingController.vendorInitiateCustomerRequest
+);
+
+router.post(
+  '/customers/:requestId/verify-otp',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(verifyCustomerOtpSchema),
+  CustomerOnboardingController.vendorVerifyCustomerOtp
+);
+
+router.post(
+  '/customers/:requestId/activate',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(activateCustomerAccountSchema),
+  CustomerOnboardingController.activateCustomer
+);
+
+router.get(
+  '/customers/registration-requests',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(listRegistrationRequestsSchema),
+  CustomerOnboardingController.listVendorRequests
+);
+
+router.patch(
+  '/customers/registration-requests/:requestId/reject',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(rejectRegistrationRequestSchema),
+  CustomerOnboardingController.rejectRequest
+);
+
+// ==========================================
+// 1c. Connected Delivery Partner Onboarding
+// ==========================================
+router.get(
+  '/delivery-boys/job-requests',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(listVendorDeliveryRequestsSchema),
+  VendorDeliveryOnboardingController.listConnectedRequests
+);
+
+router.post(
+  '/delivery-boys/activate',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(activateDeliveryBoySchema),
+  VendorDeliveryOnboardingController.activateDeliveryBoy
+);
+
+// ==========================================
+// 1d. Vendor Referral Program
+// ==========================================
+router.get(
+  '/referral',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  VendorReferralController.getReferralProfile
+);
+
+router.post(
+  '/referrals/invite',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(inviteVendorSchema),
+  VendorReferralController.inviteVendor
+);
+
+router.get(
+  '/referrals',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(listReferralsSchema),
+  VendorReferralController.listVendorReferrals
+);
+
+// ==========================================
+// 1e. Customer-Specific Products & Pricing Configuration
+// ==========================================
+router.get(
+  '/:vendorId/customers/:customerId/products',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(customerPricingParamSchema),
+  CustomerPricingController.listCustomerProducts
+);
+
+router.put(
+  '/:vendorId/customers/:customerId/products',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(updateCustomerProductsSchema),
+  CustomerPricingController.configureCustomerProducts
+);
+
+router.patch(
+  '/:vendorId/catalog-restriction',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(toggleCatalogRestrictionSchema),
+  CustomerPricingController.toggleCatalogRestriction
 );
 
 // ==========================================

@@ -12,6 +12,7 @@ import paymentRoutes, { walletRouter } from './payment.routes.js';
 import notificationRoutes from './notification.routes.js';
 import reviewRoutes from './review.routes.js';
 import analyticsRoutes from './analytics.routes.js';
+import supportRoutes from './support.routes.js';
 
 const apiRouter = Router();
 
@@ -39,6 +40,7 @@ apiRouter.use('/wallet', walletRouter);
 apiRouter.use('/notifications', notificationRoutes);
 apiRouter.use('/reviews', reviewRoutes);
 apiRouter.use('/analytics', analyticsRoutes);
+apiRouter.use('/support', supportRoutes);
 
 export default apiRouter;
 

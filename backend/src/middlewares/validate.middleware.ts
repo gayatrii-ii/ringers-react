@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject } from 'zod';
+import { ZodTypeAny } from 'zod';
 
 /**
  * Validates request body, query, and params against a Zod schema.
+ * Accepts ZodObject and ZodEffects (schemas using .refine(), .superRefine(), etc.).
  */
-export function validate(schema: AnyZodObject) {
+export function validate(schema: ZodTypeAny) {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = await schema.parseAsync({

@@ -12,6 +12,8 @@ import {
   orderIdParamSchema,
   orderQuerySchema,
 } from '../modules/orders/order.validation.js';
+import { DeliveryAssignmentController } from '../modules/delivery/delivery.assignment.controller.js';
+import { assignDeliverySchema } from '../modules/delivery/delivery.assignment.validation.js';
 
 const router = Router();
 
@@ -82,6 +84,25 @@ router.patch(
   '/:id/cancel',
   validate(cancelOrderSchema),
   OrderController.cancelOrder
+);
+
+// ==========================================
+// 5. Delivery Assignment & Handover Extensions
+// ==========================================
+// Vendor-Only delivery assignment authority
+router.post(
+  '/:id/assign-delivery',
+  requireRoles(ROLES.VENDOR),
+  validate(assignDeliverySchema),
+  DeliveryAssignmentController.assignRider
+);
+
+// Customer Direct Delivery Confirmation (Path B)
+router.post(
+  '/:id/confirm-delivery',
+  requireRoles(ROLES.CUSTOMER),
+  validate(orderIdParamSchema),
+  DeliveryAssignmentController.customerConfirmDelivery
 );
 
 export default router;

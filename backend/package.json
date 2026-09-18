@@ -15,7 +15,8 @@
     "test:order": "tsx scripts/test-order-flow.ts",
     "test:payment": "tsx scripts/test-payment-flow.ts",
     "test:phase7": "tsx scripts/test-phase7-flow.ts",
-    "test:all": "npm run test:auth && npm run test:catalog && npm run test:admin && npm run test:customer-delivery && npm run test:order && npm run test:payment && npm run test:phase7",
+    "test:phase8": "tsx scripts/test-phase8-flow.ts",
+    "test:all": "npm run test:auth && npm run test:catalog && npm run test:admin && npm run test:customer-delivery && npm run test:order && npm run test:payment && npm run test:phase7 && npm run test:phase8",
     "admin:setup": "tsx scripts/setup-super-admin.ts"
   },
   "keywords": [
@@ -35,6 +36,7 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.3",
+    "socket.io": "^4.8.3",
     "zod": "^3.24.2"
   },
   "devDependencies": {
