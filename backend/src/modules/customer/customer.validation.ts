@@ -29,10 +29,17 @@ export const updateCustomerProfileSchema = z.object({
         .max(500)
         .optional()
         .nullable(),
+      preferredLanguage: z.enum(['EN', 'HI', 'MR']).optional(),
     })
     .refine((data) => Object.keys(data).length > 0, {
       message: 'At least one profile field must be provided for update',
     }),
+});
+
+export const updateCustomerLanguageSchema = z.object({
+  body: z.object({
+    language: z.enum(['EN', 'HI', 'MR']),
+  }),
 });
 
 export const createCustomerAddressSchema = z.object({

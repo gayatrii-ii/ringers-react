@@ -379,4 +379,96 @@ export class AnalyticsService {
       },
     };
   }
+
+  /**
+   * 5. Vendor Dashboard: Sales Revenue Trend (Daily / Weekly Time Series)
+   */
+  public static async getVendorSalesTrend(
+    vendorId: string,
+    period: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<Array<{
+    date: string;
+    totalOrders: number;
+    completedOrders: number;
+    grossSales: number;
+  }>> {
+    const dateFilter = buildDateFilter(period, startDate, endDate, 'created_at', 2);
+
+    const res = await query<{
+      date_group: string;
+      total_orders: string;
+      completed_orders: string;
+      gross_sales: string;
+    }>(
+      `SELECT 
+         TO_CHAR(created_at, 'YYYY-MM-DD') AS date_group,
+         COUNT(*) AS total_orders,
+         COUNT(*) FILTER (WHERE status = 'DELIVERED') AS completed_orders,
+         COALESCE(SUM(total_amount) FILTER (WHERE status = 'DELIVERED'), 0) AS gross_sales
+       FROM order_management.orders
+       WHERE vendor_id = $1 AND ${dateFilter.sql}
+       GROUP BY date_group
+       ORDER BY date_group ASC`,
+      [vendorId, ...dateFilter.params]
+    );
+
+    return res.rows.map((r) => ({
+      date: r.date_group,
+      totalOrders: parseInt(r.total_orders || '0', 10),
+      completedOrders: parseInt(r.completed_orders || '0', 10),
+      grossSales: parseFloat(r.gross_sales || '0'),
+    }));
+  }
+
+  /**
+   * 6. Vendor Dashboard: Payment Method Breakdown (Cash vs Online vs Wallet)
+   */
+  public static async getVendorPaymentBreakdown(
+    vendorId: string,
+    period: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<Array<{
+    paymentMethod: string;
+    totalOrders: number;
+    totalAmount: number;
+    percentage: number;
+  }>> {
+    const dateFilter = buildDateFilter(period, startDate, endDate, 'created_at', 2);
+
+    const res = await query<{
+      payment_method: string;
+      total_orders: string;
+      total_amount: string;
+    }>(
+      `SELECT 
+         COALESCE(payment_method, 'UNKNOWN') AS payment_method,
+         COUNT(*) AS total_orders,
+         COALESCE(SUM(total_amount), 0) AS total_amount
+       FROM order_management.orders
+       WHERE vendor_id = $1 AND ${dateFilter.sql}
+       GROUP BY payment_method
+       ORDER BY total_amount DESC`,
+      [vendorId, ...dateFilter.params]
+    );
+
+    const totalRevenueSum = res.rows.reduce(
+      (sum, row) => sum + parseFloat(row.total_amount || '0'),
+      0
+    );
+
+    return res.rows.map((r) => {
+      const amount = parseFloat(r.total_amount || '0');
+      const percentage =
+        totalRevenueSum > 0 ? Math.round((amount / totalRevenueSum) * 1000) / 10 : 0;
+      return {
+        paymentMethod: r.payment_method,
+        totalOrders: parseInt(r.total_orders || '0', 10),
+        totalAmount: amount,
+        percentage,
+      };
+    });
+  }
 }

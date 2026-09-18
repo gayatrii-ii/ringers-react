@@ -17,6 +17,7 @@ import {
   completeDeliveryOtpSchema,
   reportDeliveryFailureSchema,
   recordLocationSchema,
+  listRiderAssignmentsSchema,
 } from '../modules/delivery/delivery.assignment.validation.js';
 
 const router = Router();
@@ -56,6 +57,13 @@ router.get(
 // ==========================================
 // 1b. Delivery Assignment Lifecycle & Handover (Rider Actions)
 // ==========================================
+router.get(
+  '/assignments',
+  requireRoles(ROLES.DELIVERY_BOY, ROLES.SUPER_ADMIN),
+  validate(listRiderAssignmentsSchema),
+  DeliveryAssignmentController.listMyAssignments
+);
+
 router.post(
   '/assignments/:id/accept',
   requireRoles(ROLES.DELIVERY_BOY),

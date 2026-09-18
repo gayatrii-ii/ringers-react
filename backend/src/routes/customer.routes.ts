@@ -6,6 +6,7 @@ import { validate } from '../middlewares/validate.middleware.js';
 import { ROLES } from '../constants/roles.js';
 import {
   updateCustomerProfileSchema,
+  updateCustomerLanguageSchema,
   createCustomerAddressSchema,
   updateCustomerAddressSchema,
   addressIdParamSchema,
@@ -30,10 +31,13 @@ router.use(authenticateToken);
 router.use(requireRoles(ROLES.CUSTOMER, ROLES.SUPER_ADMIN));
 
 // ==========================================
-// 1. Customer Profile
+// 1. Customer Profile, Settings & Stats
 // ==========================================
 router.get('/profile/me', CustomerController.getProfile);
 router.put('/profile/me', validate(updateCustomerProfileSchema), CustomerController.updateProfile);
+router.patch('/profile/language', validate(updateCustomerLanguageSchema), CustomerController.updateLanguage);
+router.get('/profile/stats', CustomerController.getStats);
+router.delete('/profile/me', CustomerController.deactivateAccount);
 
 // ==========================================
 // 2. Saved Delivery Addresses

@@ -16,3 +16,22 @@ export const listVendorDeliveryRequestsSchema = z.object({
     limit: z.string().regex(/^\d+$/).transform(Number).default('20'),
   }),
 });
+
+// ─── GET /vendors/delivery-boys ───────────────────────────────────────────
+export const listVendorDeliveryBoysSchema = z.object({
+  query: z.object({
+    status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']).optional(),
+    page: z.string().regex(/^\d+$/).transform(Number).default('1'),
+    limit: z.string().regex(/^\d+$/).transform(Number).default('20'),
+  }),
+});
+
+// ─── PATCH /vendors/delivery-boys/:riderId/status ─────────────────────────
+export const updateVendorRiderStatusSchema = z.object({
+  params: z.object({
+    riderId: z.string().uuid('Invalid rider user ID format'),
+  }),
+  body: z.object({
+    status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']),
+  }),
+});

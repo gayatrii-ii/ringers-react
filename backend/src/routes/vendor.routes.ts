@@ -31,6 +31,8 @@ import { VendorDeliveryOnboardingController } from '../modules/vendors/vendor-de
 import {
   listVendorDeliveryRequestsSchema,
   activateDeliveryBoySchema,
+  listVendorDeliveryBoysSchema,
+  updateVendorRiderStatusSchema,
 } from '../modules/vendors/vendor-delivery-onboarding.validation.js';
 import { VendorReferralController } from '../modules/vendors/vendor-referral.controller.js';
 import {
@@ -182,6 +184,22 @@ router.post(
   requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
   validate(activateDeliveryBoySchema),
   VendorDeliveryOnboardingController.activateDeliveryBoy
+);
+
+router.get(
+  '/delivery-boys',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(listVendorDeliveryBoysSchema),
+  VendorDeliveryOnboardingController.listVendorDeliveryBoys
+);
+
+router.patch(
+  '/delivery-boys/:riderId/status',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(updateVendorRiderStatusSchema),
+  VendorDeliveryOnboardingController.updateVendorRiderStatus
 );
 
 // ==========================================

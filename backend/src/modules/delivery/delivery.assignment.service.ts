@@ -997,22 +997,151 @@ export class DeliveryAssignmentService {
       }
     }
 
-    return {
-      orderId: order.id,
-      orderNumber: order.order_number,
-      orderStatus: order.status,
-      deliveryStatus: order.delivery_status,
-      deliveryBoy: assign
-        ? {
-            id: assign.delivery_boy_id,
-            firstName: assign.first_name,
-            lastName: assign.last_name,
-            phone: assign.phone,
-            vehicleType: assign.vehicle_type,
-            vehicleNumber: assign.vehicle_number,
-          }
-        : null,
-      latestLocation,
-    };
+      return {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        orderStatus: order.status,
+        deliveryStatus: order.delivery_status,
+        deliveryBoy: assign
+          ? {
+              id: assign.delivery_boy_id,
+              firstName: assign.first_name,
+              lastName: assign.last_name,
+              phone: assign.phone,
+              vehicleType: assign.vehicle_type,
+              vehicleNumber: assign.vehicle_number,
+            }
+          : null,
+        latestLocation,
+      };
+    }
+
+  /**
+   * Rider: List all delivery assignments and past delivery history
+   */
+  public static async listRiderAssignments(
+    riderUserId: string,
+    filters: { status?: 'ASSIGNED' | 'ACCEPTED' | 'PICKED_UP' | 'DELIVERED' | 'FAILED'; page?: number; limit?: number }
+  ): Promise<{
+    assignments: Array<{
+      id: string;
+      orderId: string;
+      orderNumber: string;
+      status: string;
+      assignedAt: Date;
+      acceptedAt: Date | null;
+      pickedUpAt: Date | null;
+      completedAt: Date | null;
+      failureReason: string | null;
+      totalAmount: number;
+      deliveryFee: number;
+      paymentMethod: string;
+      paymentStatus: string;
+      deliveryAddress: any;
+      vendorName: string;
+      vendorPhone: string;
+      customerName: string;
+      customerPhone: string;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const offset = (page - 1) * limit;
+
+    const conditions: string[] = ['da.delivery_boy_id = $1'];
+    const params: unknown[] = [riderUserId];
+    let pIdx = 2;
+
+    if (filters.status) {
+      conditions.push(`da.status = $${pIdx++}`);
+      params.push(filters.status);
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    const countRes = await query<{ count: string }>(
+      `SELECT COUNT(*) AS count
+       FROM delivery.delivery_assignments da
+       WHERE ${whereClause}`,
+      params
+    );
+    const total = parseInt(countRes.rows[0]?.count || '0', 10);
+
+    const dataRes = await query<{
+      id: string;
+      order_id: string;
+      order_number: string;
+      status: string;
+      assigned_at: Date;
+      accepted_at: Date | null;
+      picked_up_at: Date | null;
+      completed_at: Date | null;
+      failure_reason: string | null;
+      total_amount: string;
+      delivery_fee: string;
+      payment_method: string;
+      payment_status: string;
+      delivery_address: any;
+      vendor_name: string;
+      vendor_phone: string;
+      customer_first_name: string;
+      customer_last_name: string;
+      customer_phone: string;
+    }>(
+      `SELECT 
+         da.id,
+         da.order_id,
+         da.status,
+         da.assigned_at,
+         da.accepted_at,
+         da.picked_up_at,
+         da.completed_at,
+         da.failure_reason,
+         o.order_number,
+         o.total_amount,
+         o.delivery_fee,
+         o.payment_method,
+         o.payment_status,
+         o.delivery_address,
+         v.business_name AS vendor_name,
+         v.phone AS vendor_phone,
+         u.first_name AS customer_first_name,
+         u.last_name AS customer_last_name,
+         u.phone AS customer_phone
+       FROM delivery.delivery_assignments da
+       JOIN order_management.orders o ON o.id = da.order_id
+       JOIN vendor.vendors v ON v.id = o.vendor_id
+       JOIN identity.users u ON u.id = o.customer_id
+       WHERE ${whereClause}
+       ORDER BY da.assigned_at DESC
+       LIMIT $${pIdx++} OFFSET $${pIdx++}`,
+      [...params, limit, offset]
+    );
+
+    const assignments = dataRes.rows.map((row) => ({
+      id: row.id,
+      orderId: row.order_id,
+      orderNumber: row.order_number,
+      status: row.status,
+      assignedAt: row.assigned_at,
+      acceptedAt: row.accepted_at,
+      pickedUpAt: row.picked_up_at,
+      completedAt: row.completed_at,
+      failureReason: row.failure_reason,
+      totalAmount: parseFloat(row.total_amount || '0'),
+      deliveryFee: parseFloat(row.delivery_fee || '0'),
+      paymentMethod: row.payment_method,
+      paymentStatus: row.payment_status,
+      deliveryAddress: row.delivery_address,
+      vendorName: row.vendor_name,
+      vendorPhone: row.vendor_phone,
+      customerName: `${row.customer_first_name} ${row.customer_last_name}`.trim(),
+      customerPhone: row.customer_phone,
+    }));
+
+    return { assignments, total, page, limit };
   }
 }

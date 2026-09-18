@@ -69,3 +69,12 @@ export const assignmentIdParamSchema = z.object({
     id: z.string().uuid('Invalid assignment ID format'),
   }),
 });
+
+// ─── GET /delivery/assignments ────────────────────────────────────────────
+export const listRiderAssignmentsSchema = z.object({
+  query: z.object({
+    status: z.enum(['ASSIGNED', 'ACCEPTED', 'PICKED_UP', 'DELIVERED', 'FAILED']).optional(),
+    page: z.string().regex(/^\d+$/).transform(Number).default('1'),
+    limit: z.string().regex(/^\d+$/).transform(Number).default('20'),
+  }),
+});

@@ -380,4 +380,122 @@ export class AuthService {
 
     return true;
   }
+
+  /**
+   * Password Recovery: Step 1 - Request OTP for password reset
+   */
+  public static async forgotPassword(phone: string): Promise<{ message: string; expiresInSeconds: number }> {
+    const cleanPhone = phone.trim();
+
+    // Verify user exists
+    const userRes = await query<{ id: string }>(
+      `SELECT id FROM identity.users WHERE phone = $1 AND deleted_at IS NULL`,
+      [cleanPhone]
+    );
+
+    if (userRes.rows.length === 0) {
+      throw new AppError('No active account found with this mobile number.', 404, 'ACCOUNT_NOT_FOUND');
+    }
+
+    return await this.sendOtp(cleanPhone, 'PASSWORD_RESET');
+  }
+
+  /**
+   * Password Recovery: Step 2 - Verify OTP and update password
+   */
+  public static async resetPassword(
+    phone: string,
+    otp: string,
+    newPassword: string
+  ): Promise<{ message: string }> {
+    const cleanPhone = phone.trim();
+
+    // 1. Verify user exists
+    const userRes = await query<{ id: string }>(
+      `SELECT id FROM identity.users WHERE phone = $1 AND deleted_at IS NULL`,
+      [cleanPhone]
+    );
+
+    if (userRes.rows.length === 0 || !userRes.rows[0]) {
+      throw new AppError('No active account found with this mobile number.', 404, 'ACCOUNT_NOT_FOUND');
+    }
+
+    const userId = userRes.rows[0].id;
+
+    // 2. Verify OTP
+    await this.verifyOtp(cleanPhone, otp, 'PASSWORD_RESET');
+
+    // 3. Hash new password
+    const salt = await bcrypt.genSalt(12);
+    const newPasswordHash = await bcrypt.hash(newPassword, salt);
+
+    // 4. Update password and revoke existing refresh tokens (security measure)
+    await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE identity.users 
+         SET password_hash = $1, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $2`,
+        [newPasswordHash, userId]
+      );
+
+      await client.query(
+        `UPDATE identity.refresh_tokens 
+         SET revoked_at = CURRENT_TIMESTAMP 
+         WHERE user_id = $1`,
+        [userId]
+      );
+    });
+
+    return {
+      message: 'Password reset successfully. Please log in with your new password.',
+    };
+  }
+
+  /**
+   * Authenticated User: Change Password with old password verification
+   */
+  public static async changePassword(
+    userId: string,
+    oldPasswordPlain: string,
+    newPasswordPlain: string
+  ): Promise<{ message: string }> {
+    // 1. Fetch current password hash
+    const userRes = await query<{ id: string; password_hash: string }>(
+      `SELECT id, password_hash FROM identity.users WHERE id = $1 AND deleted_at IS NULL`,
+      [userId]
+    );
+
+    if (userRes.rows.length === 0 || !userRes.rows[0]) {
+      throw new AppError('User not found or account is deactivated.', 404, 'USER_NOT_FOUND');
+    }
+
+    const user = userRes.rows[0];
+
+    // 2. Verify old password
+    const isOldValid = await bcrypt.compare(oldPasswordPlain, user.password_hash);
+    if (!isOldValid) {
+      throw new AppError('Current password is incorrect.', 400, 'INVALID_CURRENT_PASSWORD');
+    }
+
+    // 3. Check if new password is identical
+    const isSame = await bcrypt.compare(newPasswordPlain, user.password_hash);
+    if (isSame) {
+      throw new AppError('New password must be different from current password.', 400, 'PASSWORD_CANNOT_BE_IDENTICAL');
+    }
+
+    // 4. Hash and update
+    const salt = await bcrypt.genSalt(12);
+    const newPasswordHash = await bcrypt.hash(newPasswordPlain, salt);
+
+    await query(
+      `UPDATE identity.users 
+       SET password_hash = $1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $2`,
+      [newPasswordHash, userId]
+    );
+
+    return {
+      message: 'Password changed successfully.',
+    };
+  }
 }
