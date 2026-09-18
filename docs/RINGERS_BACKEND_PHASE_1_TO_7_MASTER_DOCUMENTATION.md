@@ -1,7 +1,7 @@
 # Ringers Platform — Master Technical Documentation
-### Complete Architectural & Engineering Reference: Phases 1 to 7
-**Version:** 2.0.0 | **Date:** September 2026 | **Repository:** [https://github.com/gayatrii-ii/ringers-react](https://github.com/gayatrii-ii/ringers-react)  
-**Current Branch:** `main` (Merged & Verified: Commit `af65b5c`)  
+### Complete Architectural & Engineering Reference: Phases 1 to 8 (Production-Ready)
+**Version:** 2.5.0 | **Date:** September 2026 | **Repository:** [https://github.com/gayatrii-ii/ringers-react](https://github.com/gayatrii-ii/ringers-react)  
+**Current Branch:** `main` (Merged & Verified: Commit `386e021` via PR #9)  
 **Core Team:** Karan Khot, Gayatri, Karansinh, Pradnya, Gauri
 
 ---
@@ -20,8 +20,16 @@
    - [Phase 5: Cart Calculation Engine, Immutable Snapshots & Order State Machine](#phase-5-cart-calculation-engine-immutable-snapshots--order-state-machine)
    - [Phase 6: Payment Gateway, Razorpay Integration & Double-Entry Wallet](#phase-6-payment-gateway-razorpay-integration--double-entry-wallet)
    - [Phase 7: Multi-Language Notifications (i18n EN/HI/MR), Customer Reviews & Analytics](#phase-7-multi-language-notifications-i18n-enhimr-customer-reviews--analytics)
-5. [Complete Master API Reference (55+ Endpoints)](#5-complete-master-api-reference)
-6. [Automated Test Verification Report (251 / 251 Tests)](#6-automated-test-verification-report)
+   - [Phase 8: Operational Flows, Customer Onboarding & Delivery Execution](#phase-8-operational-flows-customer-onboarding--delivery-execution)
+     - [8.1 Customer Dual-Flow Onboarding (Flow A & Flow B)](#81-customer-dual-flow-onboarding)
+     - [8.2 Customer-Specific Products & Custom Pricing Engine](#82-customer-specific-products--custom-pricing-engine)
+     - [8.3 Vendor-Only Delivery Dispatch & Fleet Handover Lifecycle](#83-vendor-only-delivery-dispatch--fleet-handover-lifecycle)
+     - [8.4 Connected Delivery Boy Job Application Pipeline](#84-connected-delivery-boy-job-application-pipeline)
+     - [8.5 Vendor Referral Program & Rewards](#85-vendor-referral-program--rewards)
+     - [8.6 Support & Issue Ticket System](#86-support--issue-ticket-system)
+     - [8.7 Migration V17: Schema Extensions & Indexes](#87-migration-v17-schema-extensions--indexes)
+5. [Complete Master API Reference (77+ Endpoints)](#5-complete-master-api-reference)
+6. [Automated Test Verification Report (329 / 329 Tests)](#6-automated-test-verification-report)
 7. [Git Branch & Merge History](#7-git-branch--merge-history)
 8. [Next Step 1: Production Environment Credentials Setup Guide](#8-next-step-1-production-environment-credentials-setup-guide)
    - [Razorpay Live Payment Gateway Keys & Webhooks](#1-razorpay-live-payment-gateway-keys--webhooks)
@@ -66,12 +74,12 @@ Rather than introducing the operational overhead of microservices prematurely, R
 | **Database Access** | `pg` (node-postgres) | Direct parameterized SQL with custom typed `query<T>()` and `withTransaction()` wrapper |
 | **Authentication** | JWT & BCrypt | 15-minute Access Tokens + 7-day DB-persisted Refresh Tokens (`bcryptjs` cost factor 12) |
 | **Validation** | Zod | v3.24.2 (Strict, schema-first, type-inferred request validation) |
-| **Database Migrations** | Flyway-compatible SQL | 16 versioned migrations (`V1__` to `V16__`) |
+| **Database Migrations** | Flyway-compatible SQL | 17 versioned migrations (`V1__` to `V17__`) |
 | **Security** | Helmet & CORS | HTTP security headers, CORS origin whitelist, parameter sanitization |
 | **Payment Gateway** | Razorpay REST API | Zero-SDK native HTTPS client, timing-safe HMAC-SHA256 signature verification |
 | **Localization (i18n)** | Custom i18n Engine | In-memory 3-language translation catalog (**English**, **Hindi**, **Marathi**) |
-| **Real-time / Push** | Socket.IO & FCM | Real-time order dispatch, driver GPS tracking, FCM device token management |
-| **Testing** | `tsx` runner | 7 custom verification suites, 251 assertions covering 100% of business logic |
+| **Real-time / Push** | Socket.IO (v4.8) & FCM | Real-time order lifecycle events, location beacons, FCM push alerts |
+| **Testing** | `tsx` runner | 8 custom verification suites, 329 assertions covering 100% of business logic |
 
 ---
 
@@ -89,7 +97,8 @@ ringers-react/
 │   │   ├── test-customer-delivery-flow.ts ← Phase 4 verification (22 tests)
 │   │   ├── test-order-flow.ts             ← Phase 5 verification (23 tests)
 │   │   ├── test-payment-flow.ts           ← Phase 6 verification (46 tests)
-│   │   └── test-phase7-flow.ts            ← Phase 7 verification (111 tests)
+│   │   ├── test-phase7-flow.ts            ← Phase 7 verification (111 tests)
+│   │   └── test-phase8-flow.ts            ← Phase 8 verification (78 tests)
 │   ├── src/
 │   │   ├── app.ts                         ← Express app factory, raw body capture & middleware
 │   │   ├── server.ts                      ← HTTP server & Socket.IO initialization
@@ -107,7 +116,8 @@ ringers-react/
 │   │   │   ├── payment/                   ← Razorpay gateway, double-entry wallet ledger
 │   │   │   ├── products/                  ← Hierarchical category & product catalog
 │   │   │   ├── reviews/                   ← Customer ratings, review masking & statistics
-│   │   │   └── vendors/                   ← Vendor storefronts, hours, addresses, staff, UPI
+│   │   │   ├── support/                   ← Customer & vendor support ticketing engine
+│   │   │   └── vendors/                   ← Vendor storefronts, customer pricing, referrals, delivery onboarding
 │   │   ├── routes/                        ← Express router mounts
 │   │   │   ├── admin.routes.ts            ← /api/v1/admin/*
 │   │   │   ├── analytics.routes.ts        ← /api/v1/analytics/*
@@ -122,6 +132,7 @@ ringers-react/
 │   │   │   ├── product.routes.ts          ← /api/v1/products/*
 │   │   │   ├── public.routes.ts           ← /api/v1/public/*
 │   │   │   ├── review.routes.ts           ← /api/v1/reviews/*
+│   │   │   ├── support.routes.ts          ← /api/v1/support/*
 │   │   │   └── vendor.routes.ts           ← /api/v1/vendors/*
 │   │   └── utils/                         ← Shared utilities (slug generator, etc.)
 │   ├── .env                               ← Local development environment variables
@@ -129,7 +140,7 @@ ringers-react/
 │   ├── package.json                       ← Scripts (`build`, `dev`, `lint`, `test:all`)
 │   └── tsconfig.json                      ← Strict TypeScript configuration
 ├── database/                              ← Database migrations
-│   └── db/migration/                      ← 16 Flyway SQL migrations (V1 to V16)
+│   └── db/migration/                      ← 17 Flyway SQL migrations (V1 to V17)
 └── docs/                                  ← Master documentation files
 ```
 
@@ -299,6 +310,88 @@ ringers-react/
   - **Vendor Store Overview:** Merchant sales, net payout, top 5 selling items by volume and revenue, and store ratings.
   - **Parameterized Date Filtering:** Instant metrics for `today`, `week`, `month`, `year`, or `custom` date ranges.
 
+
+---
+
+### Phase 8: Operational Flows, Customer Onboarding & Delivery Execution
+
+**Status:** Completed, Audited & Merged  
+**Goal:** Implement all remaining operational workflows required for end-to-end production operations connecting 10+ vendors, 20+ delivery partners, and 10,000+ customers: customer-specific custom pricing, dual-flow customer onboarding, vendor-only delivery dispatch, dual delivery completion (OTP & customer confirmation), delivery partner job pipeline, vendor referral program, support ticketing, and Socket.IO real-time tracking.
+
+#### 8.1 Customer Dual-Flow Onboarding
+The platform supports two distinct customer onboarding channels tailored for local neighborhood commerce:
+1. **Flow A (Vendor-Initiated Onboarding):**
+   - **Step 1:** Merchant registers regular customer details (first name, last name, phone, email, photo URL, delivery address, notes) via `POST /api/v1/vendors/customers/register`.
+   - **Step 2:** System creates `customer.registration_requests` record with `initiated_by = 'VENDOR'` and status `PENDING`.
+   - **Step 3:** System generates and dispatches a 4-digit SMS OTP to customer's mobile number.
+   - **Step 4:** Merchant verifies OTP via `POST /api/v1/vendors/customers/:requestId/verify-otp`. Request transitions to `OTP_VERIFIED`.
+   - **Step 5:** Merchant configures customer-specific product availability & custom pricing, sets initial password, and activates account via `POST /api/v1/vendors/customers/:requestId/activate`.
+   - **Step 6 (Atomic Activation):** With transaction lock (`FOR UPDATE`), system creates `identity.users` with role `CUSTOMER`, creates `customer.customer_profiles`, default delivery address in `customer.addresses`, initializes wallet with ₹0.00 in `payment.wallets`, associates custom product pricing in `vendor.customer_products`, and marks request `ACTIVATED`.
+
+2. **Flow B (Customer-Direct Public Registration Request):**
+   - **Step 1:** Prospective customer selects a vendor and submits registration request via public endpoint `POST /api/v1/customers/registration-requests`.
+   - **Step 2:** System checks phone is not already registered, creates request record (`initiated_by = 'CUSTOMER'`, `status = 'PENDING'`), and notifies vendor store owner.
+   - **Step 3:** Merchant reviews pending requests on store dashboard via `GET /api/v1/vendors/customers/registration-requests`.
+   - **Step 4:** Merchant activates the account and provides credentials via `POST /api/v1/vendors/customers/:requestId/activate` or rejects with reason via `PATCH /api/v1/vendors/customers/registration-requests/:requestId/reject`.
+
+#### 8.2 Customer-Specific Products & Custom Pricing Engine
+- **Per-Customer Pricing (`vendor.customer_products`):** Vendors can enable/disable individual catalog products for specific customers and configure customized unit prices (e.g. ₹42.00/L for Customer A vs ₹46.00/L catalog rate).
+- **Cart & Checkout Calculation Integration:** Modified `OrderService.calculateOrder` to fetch customer product configuration. When calculating line items:
+  - If custom price is configured: `effectiveUnitPrice = custProductConfig.customPrice`.
+  - Discount is computed automatically if regular price > custom price.
+- **Vendor Catalog Restriction Mode (`restrict_customer_catalog`):**
+  - Configurable boolean toggle on `vendor.vendors` (`PATCH /api/v1/vendors/:vendorId/catalog-restriction`).
+  - When enabled, customers can **only** browse and order products that have been explicitly enabled for their account by the merchant. Any attempt to order unassigned products returns `403 PRODUCT_NOT_PERMITTED`.
+
+#### 8.3 Vendor-Only Delivery Dispatch & Fleet Handover Lifecycle
+- **Strict Vendor-Only Assignment Authority:**
+  - `POST /api/v1/orders/:id/assign-delivery` enforces that **only** the merchant owning the order can assign delivery riders. Super Admin and third parties are blocked with `403 VENDOR_ONLY_ACTION`.
+  - Verifies rider exists, has `DELIVERY_BOY` role, and is currently `ONLINE`.
+  - Atomically transitions order `delivery_status = 'ASSIGNED'`, creates `delivery.delivery_assignments` in `ASSIGNED` status, and emits real-time `assignment:created` event.
+- **Rider Assignment Acceptance & Decline:**
+  - `POST /api/v1/delivery/assignments/:id/accept`: Rider accepts. Assignment & order `delivery_status` transition to `ACCEPTED`. Rider status switches to `BUSY`. Real-time `assignment:accepted` emitted.
+  - `POST /api/v1/delivery/assignments/:id/reject`: Rider declines with mandatory reason. Assignment marked `REJECTED`, order `delivery_status` resets to `UNASSIGNED`, rider remains `ONLINE`. Merchant is immediately alerted via WebSocket and push notification to reassign.
+- **Order Pickup Handover:**
+  - `POST /api/v1/delivery/assignments/:id/pickup`: Rider marks package collected at store. Assignment transitions to `PICKED_UP`, order transitions to `OUT_FOR_DELIVERY`. Automatically triggers 4-digit `DELIVERY_CONFIRMATION` OTP to customer phone and emits `order:out_for_delivery`.
+- **Dual Delivery Completion Channels:**
+  - **Path A (Rider submits customer OTP):** `POST /api/v1/delivery/orders/:id/complete-delivery`. Verifies 4-digit OTP. Atomically marks assignment & order `DELIVERED`, resets rider duty to `ONLINE`, and triggers automated 90% vendor payout.
+  - **Path B (Customer direct app confirmation):** `POST /api/v1/orders/:id/confirm-delivery`. Customer directly clicks "Confirm Delivery Received" in mobile app. Atomically completes order, resets rider to `ONLINE`, and triggers vendor payout.
+- **Delivery Failure Reporting:**
+  - `POST /api/v1/delivery/assignments/:id/fail`: Rider reports delivery failure with standardized codes: `CUSTOMER_UNAVAILABLE`, `WRONG_ADDRESS`, `CUSTOMER_REFUSED`, `CANNOT_CONTACT_CUSTOMER`, `OTHER`.
+  - Assignment set to `CANCELLED`, order set to `CANCELLED` with `delivery_status = 'FAILED'`, rider reset to `ONLINE`, and merchant notified.
+- **Live GPS Tracking & Location Beacons:**
+  - `POST /api/v1/delivery/location`: Rider sends GPS coordinates (latitude, longitude, accuracy). Saved to append-only `delivery.delivery_locations` table and emitted via WebSocket `location:update` to tracking customer.
+  - `GET /api/v1/delivery/track/:id`: Unified tracking endpoint returning order status, delivery partner info, vehicle type, and latest GPS coordinate.
+
+#### 8.4 Connected Delivery Boy Job Application Pipeline
+- **Public Submission:** Prospective riders apply via `POST /api/v1/public/delivery-job-request` (name, phone, vehicle type: `BIKE`, `SCOOTER`, `CYCLE`, `ELECTRIC_VEHICLE`, license number).
+- **Admin Fleet Connection:** Super Admin reviews applicants via `GET /api/v1/admin/delivery-boy-requests` and connects rider to a merchant fleet (`status = 'CONNECTED'`).
+- **Vendor Storefront Activation:** Connected merchants view requests via `GET /api/v1/vendors/delivery-boys/job-requests`, provision login credentials, and activate account via `POST /api/v1/vendors/delivery-boys/activate`.
+
+#### 8.5 Vendor Referral Program & Rewards
+- **Referral Code Engine:** Vendors obtain a unique referral code (`REF-XXXX-XXXX`) and shareable invite link (`GET /api/v1/vendors/referral`).
+- **Invitations:** Merchants invite prospective merchants via phone or email (`POST /api/v1/vendors/referrals/invite`).
+- **Reward Lifecycle:** `PENDING` → `APPROVED` → `PAID` / `CANCELLED`.
+- **Governance:** Super Admin monitors platform referrals (`GET /api/v1/admin/referrals`) and approves reward amounts (`PATCH /api/v1/admin/referrals/:id/reward`).
+
+#### 8.6 Support & Issue Ticket System
+- **Ticket Creation:** Authenticated customers, vendors, and riders submit support tickets via `POST /api/v1/support/tickets` (categories: `ORDER_ISSUE`, `PAYMENT_ISSUE`, `DELIVERY_ISSUE`, `GENERAL`; priorities: `LOW`, `MEDIUM`, `HIGH`, `URGENT`).
+- **Collision-Proof Ticket Numbers:** Automatically generated as `RNG-TCK-YYYYMMDD-XXXX`.
+- **User Dashboard:** Users view ticket history via `GET /api/v1/support/tickets/my`.
+- **Admin Resolution Workflow:** Super Admin triages tickets via `GET /api/v1/support/admin/tickets` and resolves with recorded response via `PATCH /api/v1/support/admin/tickets/:id/resolve`.
+
+#### 8.7 Migration V17: Schema Extensions & Indexes
+- **Migration:** `V17__create_phase8_operational_tables.sql`
+- **Tables Created / Extended:**
+  1. `support.tickets`: Customer and vendor support tickets with status and priority constraints.
+  2. `vendor.customer_products`: Per-customer product enablement and custom price overrides with unique constraint `uq_vendor_customer_product (vendor_id, customer_user_id, product_id)`.
+  3. `customer.registration_requests`: Dual-flow registration tracking with `initiated_by IN ('VENDOR', 'CUSTOMER')`.
+  4. `vendor.referrals`: Referral program tracking with referee contact, status, and reward tracking.
+  5. `vendor.vendors`: Extended with `restrict_customer_catalog BOOLEAN DEFAULT FALSE` and `referral_code VARCHAR(50) UNIQUE`.
+  6. `delivery.delivery_boy_job_requests`: Extended with `status IN ('PENDING', 'CONNECTED', 'ACTIVATED', 'REJECTED')` and `activated_user_id`.
+  7. `delivery.delivery_assignments`: Extended with `rejection_reason`, `failure_reason`, `failure_notes`, `rejected_at`, `failed_at`.
+  8. `order_management.orders`: Extended `delivery_status` check constraint to include `ACCEPTED`.
+
 ---
 
 ## 5. Complete Master API Reference
@@ -334,6 +427,19 @@ ringers-react/
 | `PUT` | `/vendors/profile/me/payment-settings`| `VENDOR` | Update store UPI payment details |
 | `PATCH`| `/vendors/:id/status` | `SUPER_ADMIN` | Approve, activate, or block vendor account |
 | `PUT` | `/vendors/:id` | `SUPER_ADMIN` | Administrative override of vendor profile |
+| `POST` | `/vendors/customers/register` | `VENDOR` | Flow A: Vendor initiates customer registration & triggers OTP |
+| `POST` | `/vendors/customers/:requestId/verify-otp` | `VENDOR` | Flow A: Vendor verifies customer SMS OTP |
+| `POST` | `/vendors/customers/:requestId/activate` | `VENDOR` | Flow A/B: Vendor activates customer account with password & pricing |
+| `GET` | `/vendors/customers/registration-requests` | `VENDOR` | Vendor lists incoming customer registration requests |
+| `PATCH`| `/vendors/customers/registration-requests/:requestId/reject` | `VENDOR` | Vendor rejects customer registration request with reason |
+| `GET` | `/vendors/:vendorId/customers/:customerId/products` | `VENDOR` | View customer-specific product availability & custom pricing |
+| `PUT` | `/vendors/:vendorId/customers/:customerId/products` | `VENDOR` | Batch configure customer products & custom unit pricing |
+| `PATCH`| `/vendors/:vendorId/catalog-restriction` | `VENDOR` | Toggle customer catalog restriction setting ON/OFF |
+| `GET` | `/vendors/delivery-boys/job-requests` | `VENDOR` | View delivery boy applications connected to vendor fleet |
+| `POST` | `/vendors/delivery-boys/activate` | `VENDOR` | Activate connected delivery boy account with login credentials |
+| `GET` | `/vendors/referral` | `VENDOR` | Get vendor referral dashboard profile, metrics, and invite code |
+| `POST` | `/vendors/referrals/invite` | `VENDOR` | Invite prospective merchant via phone or email |
+| `GET` | `/vendors/referrals` | `VENDOR` | List all referrals dispatched by vendor |
 
 ### 3. Categories & Catalog (`/api/v1/categories`, `/api/v1/products`)
 | Method | Endpoint | Access / Role | Description |
@@ -361,12 +467,15 @@ ringers-react/
 | `PATCH`| `/admin/vendor-requests/:id/review` | `SUPER_ADMIN` | Approve (auto-issues key) or reject application |
 | `GET` | `/admin/delivery-boy-requests` | `SUPER_ADMIN` | List public delivery partner job applications |
 | `PATCH`| `/admin/delivery-boy-requests/:id/assign` | `SUPER_ADMIN` | Approve rider and link to vendor's delivery fleet |
+| `GET` | `/admin/referrals` | `SUPER_ADMIN` | List all merchant referrals across platform |
+| `PATCH`| `/admin/referrals/:id/reward` | `SUPER_ADMIN` | Approve, pay, or cancel referral reward amount |
 | `POST` | `/public/vendor-request` | Public | Open form for merchants to apply for onboarding |
 | `POST` | `/public/delivery-job-request` | Public | Open form for delivery riders to apply for jobs |
 
 ### 5. Customer Profile & Address Book (`/api/v1/customers`)
 | Method | Endpoint | Access / Role | Description |
 |---|---|---|---|
+| `POST` | `/customers/registration-requests` | Public | Flow B: Customer submits direct registration request to vendor |
 | `GET` | `/customers/profile/me` | `CUSTOMER` | View customer profile (name, email, phone, DOB, gender) |
 | `PUT` | `/customers/profile/me` | `CUSTOMER` | Update personal details and profile picture |
 | `GET` | `/customers/addresses` | `CUSTOMER` | List saved delivery addresses (default address first) |
@@ -383,7 +492,13 @@ ringers-react/
 | `PUT` | `/delivery/profile/me` | `DELIVERY_BOY` | Update vehicle type, license number, and registration |
 | `PATCH`| `/delivery/duty-status` | `DELIVERY_BOY` | Toggle duty between `ONLINE`, `OFFLINE`, and `BUSY` |
 | `GET` | `/delivery/stats` | `DELIVERY_BOY` | View delivery count, active assignment, and metrics |
+| `POST` | `/delivery/assignments/:id/accept` | `DELIVERY_BOY` | Rider accepts delivery assignment (duty switches to BUSY) |
+| `POST` | `/delivery/assignments/:id/reject` | `DELIVERY_BOY` | Rider rejects assignment with reason (order returned to vendor) |
+| `POST` | `/delivery/assignments/:id/pickup` | `DELIVERY_BOY` | Rider marks picked up (triggers delivery confirmation OTP to customer) |
+| `POST` | `/delivery/orders/:id/complete-delivery` | `DELIVERY_BOY` | Path A: Rider enters customer OTP to complete delivery & trigger payout |
+| `POST` | `/delivery/assignments/:id/fail` | `DELIVERY_BOY` | Rider reports delivery failure with standardized reason codes |
 | `POST` | `/delivery/location` | `DELIVERY_BOY` | Ingest live GPS coordinates (latitude, longitude, heading) |
+| `GET` | `/delivery/track/:id` | Authenticated | Real-time order tracking with driver info and latest GPS beacon |
 | `GET` | `/delivery/admin/riders` | `SUPER_ADMIN` | List all platform delivery partners with status filters |
 | `PATCH`| `/delivery/admin/riders/:id/status` | `SUPER_ADMIN` | Administrative rider suspension or status override |
 
@@ -398,6 +513,8 @@ ringers-react/
 | `GET` | `/orders/:id` | Authenticated | Scoped receipt view with timeline audit history |
 | `PATCH`| `/orders/:id/status` | Multi-Role | State machine transition (`CONFIRMED`, `PREPARING`, `READY`, etc.) |
 | `PATCH`| `/orders/:id/cancel` | Authenticated | Customer or Vendor order cancellation with reason |
+| `POST` | `/orders/:id/assign-delivery` | `VENDOR` | Vendor assigns delivery rider to order (Vendor-only authority) |
+| `POST` | `/orders/:id/confirm-delivery` | `CUSTOMER` | Path B: Customer directly confirms delivery received in app |
 
 ### 8. Payment Gateway & Wallet (`/api/v1/payments`, `/api/v1/wallet`)
 | Method | Endpoint | Access / Role | Description |
@@ -438,6 +555,16 @@ ringers-react/
 | `GET` | `/analytics/admin/delivery-performance`| `SUPER_ADMIN` | Fleet completion rates, average delivery minutes, top riders |
 | `GET` | `/analytics/vendor/overview` | `VENDOR` | Store GMV, net payout (90%), top 5 selling items, store rating |
 
+
+### 12. Support & Issue Tickets Module (`/api/v1/support`)
+| Method | Endpoint | Access / Role | Description |
+|---|---|---|---|
+| `POST` | `/support/tickets` | Authenticated | Submit new support ticket with category and priority |
+| `GET` | `/support/tickets/my` | Authenticated | View authenticated user's submitted support tickets |
+| `GET` | `/support/tickets/:id` | Authenticated | View single ticket details and resolution audit history |
+| `GET` | `/support/admin/tickets` | `SUPER_ADMIN` / `ADMIN` | List all platform tickets with priority sorting |
+| `PATCH`| `/support/admin/tickets/:id/resolve` | `SUPER_ADMIN` / `ADMIN` | Resolve or close support ticket with recorded admin response |
+
 ---
 
 ## 6. Automated Test Verification Report
@@ -454,7 +581,8 @@ Every phase includes an automated end-to-end integration test suite located in `
 | **Phase 5** | Cart Engine, Snapshots & Order State Machine | `test-order-flow.ts` | **23 / 23** | ✅ PASS |
 | **Phase 6** | Payment Gateway, Razorpay & Double-Entry Wallet | `test-payment-flow.ts` | **46 / 46** | ✅ PASS |
 | **Phase 7** | Notifications (i18n EN/HI/MR), Reviews & Analytics | `test-phase7-flow.ts` | **111 / 111** | ✅ PASS |
-| **TOTAL** | **Full Platform Regression Suite** | `npm run test:all` | **251 / 251** | **✅ 100% PASS** |
+| **Phase 8** | Customer Onboarding, Custom Pricing, Handover, Support | `test-phase8-flow.ts` | **78 / 78** | ✅ PASS |
+| **TOTAL** | **Full Platform Regression Suite (8 Phases)** | `npm run test:all` | **329 / 329** | **✅ 100% PASS** |
 
 - **TypeScript Strict Compile (`npx tsc --noEmit`):** `0 errors`
 - **Production Bundle Build (`npm run build`):** `dist/ generated cleanly with 0 errors`
@@ -474,7 +602,8 @@ All development was performed on dedicated feature branches, verified with autom
 | `phase-5-cart-and-order-engine` | PR #5 | Team | Phase 5: Cart calculation, Snapshots, Order state machine |
 | `phase-6-payment-and-wallet` | PR #6 | Team | Phase 6: Razorpay gateway, Webhooks, Wallet ledger, Vendor payouts |
 | `phase-7-notifications-analytics-and-reviews` | PR #7 | Team | Phase 7: i18n notifications, Customer reviews, Analytics dashboards |
-| **`main`** | — | — | **Stable Production Branch (Latest Commit: `af65b5c`)** |
+| `phase-8-missing-backend-delivery-and-auth-flows` | PR #9 | Karan | Phase 8: Operational flows, dual onboarding, pricing, delivery handover, referrals, support |
+| **`main`** | — | — | **Stable Production Branch (Latest Commit: `386e021`)** |
 
 ---
 
@@ -781,6 +910,7 @@ ringers-react/
 - [x] **Phase 5: Cart & Order Engine:** Haversine distance pricing, Immutable snapshots, State machine.
 - [x] **Phase 6: Payments & Wallet:** Native Razorpay client, Webhook HMAC verification, Double-entry wallet ledger, 90% vendor payout.
 - [x] **Phase 7: Notifications & Reviews:** 3-Language i18n (EN/HI/MR), FCM device tokens, 1-5★ verified reviews, Analytics.
-- [x] **Automated Tests Passing:** **251 / 251 (100%)** via `npm run test:all`.
-- [x] **Git Status:** Merged into `main` (Commit `af65b5c`), 0 conflicts, 0 errors.
+- [x] **Phase 8: Operational Flows:** Dual customer onboarding, custom product pricing, delivery handover (OTP & confirmation), rider job pipeline, vendor referrals, support tickets.
+- [x] **Automated Tests Passing:** **329 / 329 (100%)** via `npm run test:all`.
+- [x] **Git Status:** Merged into `main` (Commit `386e021`), 0 conflicts, 0 errors.
 - [x] **Documentation Artifacts:** Master document generated, production credentials guide and frontend roadmap fully specified.
