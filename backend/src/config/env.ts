@@ -2,8 +2,19 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { z } from 'zod';
 
-// Load .env file
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+// Load .env file (checks current working directory, and also parent directory if running from backend/)
+import fs from 'fs';
+
+const localEnv = path.resolve(process.cwd(), '.env');
+const parentEnv = path.resolve(process.cwd(), '..', '.env');
+
+if (fs.existsSync(localEnv)) {
+  dotenv.config({ path: localEnv });
+} else if (fs.existsSync(parentEnv)) {
+  dotenv.config({ path: parentEnv });
+} else {
+  dotenv.config();
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
