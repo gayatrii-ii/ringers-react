@@ -10,6 +10,11 @@ import {
   reviewVendorRequestSchema,
   assignDeliveryRequestSchema,
 } from '../modules/admin/admin.validation.js';
+import { VendorReferralController } from '../modules/vendors/vendor-referral.controller.js';
+import {
+  listReferralsSchema,
+  updateRewardStatusSchema,
+} from '../modules/vendors/vendor-referral.validation.js';
 
 const router = Router();
 
@@ -47,5 +52,20 @@ router.patch(
 // 4. Platform Overview Metrics
 // ==========================================
 router.get('/metrics', AdminController.getPlatformMetrics);
+
+// ==========================================
+// 5. Vendor Referral Governance
+// ==========================================
+router.get(
+  '/referrals',
+  validate(listReferralsSchema),
+  VendorReferralController.adminListReferrals
+);
+
+router.patch(
+  '/referrals/:id/reward',
+  validate(updateRewardStatusSchema),
+  VendorReferralController.adminUpdateRewardStatus
+);
 
 export default router;

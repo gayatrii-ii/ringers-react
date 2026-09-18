@@ -9,6 +9,15 @@ import {
   updateDutyStatusSchema,
   adminUpdateRiderStatusSchema,
 } from '../modules/delivery/delivery.validation.js';
+import { DeliveryAssignmentController } from '../modules/delivery/delivery.assignment.controller.js';
+import {
+  assignmentIdParamSchema,
+  orderIdParamSchema,
+  rejectAssignmentSchema,
+  completeDeliveryOtpSchema,
+  reportDeliveryFailureSchema,
+  recordLocationSchema,
+} from '../modules/delivery/delivery.assignment.validation.js';
 
 const router = Router();
 
@@ -16,7 +25,7 @@ const router = Router();
 router.use(authenticateToken);
 
 // ==========================================
-// 1. Delivery Partner (Rider) Routes
+// 1. Delivery Partner (Rider) Profile & Duty Routes
 // ==========================================
 router.get(
   '/profile/me',
@@ -42,6 +51,63 @@ router.get(
   '/stats',
   requireRoles(ROLES.DELIVERY_BOY, ROLES.SUPER_ADMIN),
   DeliveryController.getStats
+);
+
+// ==========================================
+// 1b. Delivery Assignment Lifecycle & Handover (Rider Actions)
+// ==========================================
+router.post(
+  '/assignments/:id/accept',
+  requireRoles(ROLES.DELIVERY_BOY),
+  validate(assignmentIdParamSchema),
+  DeliveryAssignmentController.acceptAssignment
+);
+
+router.post(
+  '/assignments/:id/reject',
+  requireRoles(ROLES.DELIVERY_BOY),
+  validate(assignmentIdParamSchema),
+  validate(rejectAssignmentSchema),
+  DeliveryAssignmentController.rejectAssignment
+);
+
+router.post(
+  '/assignments/:id/pickup',
+  requireRoles(ROLES.DELIVERY_BOY),
+  validate(assignmentIdParamSchema),
+  DeliveryAssignmentController.markPickedUp
+);
+
+router.post(
+  '/orders/:id/complete-delivery',
+  requireRoles(ROLES.DELIVERY_BOY),
+  validate(orderIdParamSchema),
+  validate(completeDeliveryOtpSchema),
+  DeliveryAssignmentController.completeDeliveryWithOtp
+);
+
+router.post(
+  '/assignments/:id/fail',
+  requireRoles(ROLES.DELIVERY_BOY),
+  validate(assignmentIdParamSchema),
+  validate(reportDeliveryFailureSchema),
+  DeliveryAssignmentController.reportDeliveryFailure
+);
+
+router.post(
+  '/location',
+  requireRoles(ROLES.DELIVERY_BOY),
+  validate(recordLocationSchema),
+  DeliveryAssignmentController.recordLocation
+);
+
+// ==========================================
+// 1c. Real-Time Order Tracking (Customer / Vendor / Rider / Admin)
+// ==========================================
+router.get(
+  '/track/:id',
+  validate(orderIdParamSchema),
+  DeliveryAssignmentController.getOrderTracking
 );
 
 // ==========================================

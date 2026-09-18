@@ -207,6 +207,32 @@ export class OrderService {
       }
     }
 
+    // 5b. Fetch Customer-Specific Products & Custom Pricing
+    const customPricingRes = await query<{
+      product_id: string;
+      is_enabled: boolean;
+      custom_price: string | null;
+    }>(
+      `SELECT product_id, is_enabled, custom_price
+       FROM vendor.customer_products
+       WHERE vendor_id = $1 AND customer_user_id = $2 AND product_id = ANY($3::uuid[])`,
+      [vendorId, customerId, productIds]
+    );
+
+    const customerProductMap = new Map<string, { isEnabled: boolean; customPrice: number | null }>();
+    for (const cp of customPricingRes.rows) {
+      customerProductMap.set(cp.product_id, {
+        isEnabled: cp.is_enabled,
+        customPrice: cp.custom_price !== null ? parseFloat(cp.custom_price) : null,
+      });
+    }
+
+    const vendorSettingsRes = await query<{ restrict_customer_catalog: boolean }>(
+      `SELECT restrict_customer_catalog FROM vendor.vendors WHERE id = $1`,
+      [vendorId]
+    );
+    const restrictCatalog = vendorSettingsRes.rows[0]?.restrict_customer_catalog || false;
+
     // 6. Calculate Line Items
     const calculatedItems: CalculatedItem[] = [];
     let subtotal = 0;
@@ -228,13 +254,27 @@ export class OrderService {
         throw new AppError(`Product "${product.name}" is currently ${product.status.toLowerCase()}`, 400, 'PRODUCT_UNAVAILABLE');
       }
 
+      // Enforce customer product restrictions
+      const custProductConfig = customerProductMap.get(item.productId);
+      if (restrictCatalog) {
+        if (!custProductConfig || !custProductConfig.isEnabled) {
+          throw new AppError(`Product "${product.name}" is not enabled for your customer account`, 403, 'PRODUCT_NOT_PERMITTED');
+        }
+      } else if (custProductConfig && !custProductConfig.isEnabled) {
+        throw new AppError(`Product "${product.name}" is not enabled for your customer account`, 403, 'PRODUCT_NOT_PERMITTED');
+      }
+
       const regularPrice = parseFloat(product.price);
       let effectiveUnitPrice = regularPrice;
       let discountPerUnit = 0;
       let variantName: string | null = null;
 
-      // Check variant pricing
-      if (item.variantId) {
+      // Check customer-specific custom price override (applies when ordering base product without variant)
+      if (!item.variantId && custProductConfig && custProductConfig.customPrice !== null) {
+        effectiveUnitPrice = custProductConfig.customPrice;
+        discountPerUnit = regularPrice > effectiveUnitPrice ? Math.round((regularPrice - effectiveUnitPrice) * 100) / 100 : 0;
+      } else if (item.variantId) {
+        // Check variant pricing
         const variant = variantMap.get(item.variantId);
         if (!variant || variant.product_id !== product.id) {
           throw new AppError(`Variant not found for product "${product.name}"`, 404, 'VARIANT_NOT_FOUND');
@@ -486,6 +526,14 @@ export class OrderService {
       const currentStatus = order.status;
 
       // 2. Validate transition validity
+      if (newStatus === 'DELIVERED') {
+        throw new AppError(
+          'Deliveries must be completed via OTP verification (POST /api/v1/delivery/orders/:id/complete-delivery) or Customer confirmation (POST /api/v1/orders/:id/confirm-delivery).',
+          400,
+          'USE_DELIVERY_CONFIRMATION_FLOW'
+        );
+      }
+
       const allowedNext = ALLOWED_TRANSITIONS[currentStatus] || [];
       if (!allowedNext.includes(newStatus)) {
         throw new AppError(

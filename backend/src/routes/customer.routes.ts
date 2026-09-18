@@ -10,10 +10,22 @@ import {
   updateCustomerAddressSchema,
   addressIdParamSchema,
 } from '../modules/customer/customer.validation.js';
+import { CustomerOnboardingController } from '../modules/customer/customer-onboarding.controller.js';
+import { customerDirectRegistrationSchema } from '../modules/customer/customer-onboarding.validation.js';
 
 const router = Router();
 
-// All customer routes require authentication and CUSTOMER or SUPER_ADMIN role
+// ==========================================
+// Public: Customer Direct Registration Request (Flow B)
+// Unauthenticated prospective customer submits request to selected vendor
+// ==========================================
+router.post(
+  '/registration-requests',
+  validate(customerDirectRegistrationSchema),
+  CustomerOnboardingController.submitDirectCustomerRequest
+);
+
+// All subsequent customer routes require authentication and CUSTOMER or SUPER_ADMIN role
 router.use(authenticateToken);
 router.use(requireRoles(ROLES.CUSTOMER, ROLES.SUPER_ADMIN));
 
