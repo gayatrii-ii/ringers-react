@@ -15,7 +15,8 @@
     "test:order": "tsx scripts/test-order-flow.ts",
     "test:payment": "tsx scripts/test-payment-flow.ts",
     "test:phase7": "tsx scripts/test-phase7-flow.ts",
-    "test:all": "npm run test:auth && npm run test:catalog && npm run test:admin && npm run test:customer-delivery && npm run test:order && npm run test:payment && npm run test:phase7"
+    "test:all": "npm run test:auth && npm run test:catalog && npm run test:admin && npm run test:customer-delivery && npm run test:order && npm run test:payment && npm run test:phase7",
+    "admin:setup": "tsx scripts/setup-super-admin.ts"
   },
   "keywords": [
     "ringers",

@@ -25,9 +25,9 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters long'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
 
-  // Super Admin Fallback / Seed Credentials
-  SUPER_ADMIN_EMAIL: z.string().email().default('superadmin@ringer.com'),
-  SUPER_ADMIN_PASSWORD: z.string().default('SuperAdmin@123!'),
+  // Super Admin Credentials (read strictly from .env, zero hardcoded credentials in source control)
+  SUPER_ADMIN_EMAIL: z.string().email().optional().default(''),
+  SUPER_ADMIN_PASSWORD: z.string().optional().default(''),
 
   // Razorpay Payment Gateway (optional in dev/test, required in production)
   RAZORPAY_KEY_ID: z.string().optional().default(''),
