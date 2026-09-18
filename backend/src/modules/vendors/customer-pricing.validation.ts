@@ -9,6 +9,10 @@ const customerProductItemSchema = z.object({
 
 // ─── PUT /vendors/:vendorId/customers/:customerId/products ─────────────────
 export const updateCustomerProductsSchema = z.object({
+  params: z.object({
+    vendorId: z.string().uuid('Invalid vendor ID format'),
+    customerId: z.string().uuid('Invalid customer ID format'),
+  }),
   body: z.object({
     products: z.array(customerProductItemSchema).min(1, 'At least one product must be specified'),
   }),

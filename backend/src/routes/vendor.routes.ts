@@ -225,7 +225,6 @@ router.put(
   '/:vendorId/customers/:customerId/products',
   authenticateToken,
   requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
-  validate(customerPricingParamSchema),
   validate(updateCustomerProductsSchema),
   CustomerPricingController.configureCustomerProducts
 );

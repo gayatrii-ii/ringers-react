@@ -93,7 +93,6 @@ router.patch(
 router.post(
   '/:id/assign-delivery',
   requireRoles(ROLES.VENDOR),
-  validate(orderIdParamSchema),
   validate(assignDeliverySchema),
   DeliveryAssignmentController.assignRider
 );

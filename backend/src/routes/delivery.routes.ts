@@ -66,7 +66,6 @@ router.post(
 router.post(
   '/assignments/:id/reject',
   requireRoles(ROLES.DELIVERY_BOY),
-  validate(assignmentIdParamSchema),
   validate(rejectAssignmentSchema),
   DeliveryAssignmentController.rejectAssignment
 );
@@ -81,7 +80,6 @@ router.post(
 router.post(
   '/orders/:id/complete-delivery',
   requireRoles(ROLES.DELIVERY_BOY),
-  validate(orderIdParamSchema),
   validate(completeDeliveryOtpSchema),
   DeliveryAssignmentController.completeDeliveryWithOtp
 );
@@ -89,7 +87,6 @@ router.post(
 router.post(
   '/assignments/:id/fail',
   requireRoles(ROLES.DELIVERY_BOY),
-  validate(assignmentIdParamSchema),
   validate(reportDeliveryFailureSchema),
   DeliveryAssignmentController.reportDeliveryFailure
 );
