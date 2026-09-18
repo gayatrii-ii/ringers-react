@@ -39,3 +39,14 @@ export const adminBroadcastSchema = z.object({
     lang: z.enum(['EN', 'HI', 'MR']).default('EN'),
   }),
 });
+
+export const updateNotificationPreferencesSchema = z.object({
+  body: z.object({
+    orderUpdates: z.boolean().optional(),
+    promotionalAlerts: z.boolean().optional(),
+    deliveryStatus: z.boolean().optional(),
+    smsEnabled: z.boolean().optional(),
+    pushEnabled: z.boolean().optional(),
+    emailEnabled: z.boolean().optional(),
+  }),
+});

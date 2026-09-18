@@ -29,8 +29,8 @@
      - [8.6 Support & Issue Ticket System](#86-support--issue-ticket-system)
      - [8.7 Migration V17: Schema Extensions & Indexes](#87-migration-v17-schema-extensions--indexes)
      - [8.8 Production Readiness Gap Closures & Operational APIs](#88-production-readiness-gap-closures--operational-apis)
-5. [Complete Master API Reference (89+ Endpoints)](#5-complete-master-api-reference)
-6. [Automated Test Verification Report (382 / 382 Tests)](#6-automated-test-verification-report)
+5. [Complete Master API Reference (94+ Endpoints)](#5-complete-master-api-reference)
+6. [Automated Test Verification Report (398 / 398 Tests)](#6-automated-test-verification-report)
 7. [Git Branch & Merge History](#7-git-branch--merge-history)
 8. [Next Step 1: Production Environment Credentials Setup Guide](#8-next-step-1-production-environment-credentials-setup-guide)
    - [Razorpay Live Payment Gateway Keys & Webhooks](#1-razorpay-live-payment-gateway-keys--webhooks)
@@ -413,6 +413,13 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 - **8.8.7 Vendor Analytical Sales Trends & Payment Breakdown (`/api/v1/analytics`):**
   - `GET /analytics/vendor/sales-trend`: Daily/weekly sales time-series data for frontend revenue graph visualization.
   - `GET /analytics/vendor/payment-breakdown`: Order volume and gross revenue distribution across Cash on Delivery, Razorpay Online, and Wallet.
+- **8.8.8 Granular User Notification Preferences (`/api/v1/notifications`):**
+  - `GET /notifications/preferences`: Retrieves user toggle states for `orderUpdates`, `promotionalAlerts`, `deliveryStatus`, `smsEnabled`, and `pushEnabled`.
+  - `PUT /notifications/preferences`: Allows users to customize and disable non-critical notification channels.
+- **8.8.9 Detailed Vendor Line-Item & Performance Reporting (`/api/v1/analytics`):**
+  - `GET /analytics/vendor/product-sales`: Paginated report of all catalog products with quantity sold, gross revenue, and unit pricing.
+  - `GET /analytics/vendor/customer-sales`: Breakdown of top customers by total order frequency, lifetime spend, and last purchase date.
+  - `GET /analytics/vendor/rider-performance`: Detailed roster of delivery boys assigned to vendor with total trips, successful deliveries, failure counts, and average delivery duration.
 
 ---
 
@@ -566,6 +573,8 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 ### 9. Notifications Module (`/api/v1/notifications`)
 | Method | Endpoint | Access / Role | Description |
 |---|---|---|---|
+| `GET` | `/notifications/preferences` | Authenticated | View current notification preferences and enabled channels |
+| `PUT` | `/notifications/preferences` | Authenticated | Update notification toggles (`orderUpdates`, `promotions`, `sms`, `push`) |
 | `GET` | `/notifications` | Authenticated | Paginated in-app notification feed with unread filter |
 | `GET` | `/notifications/unread-count` | Authenticated | Quick badge count for app header & navigation bar |
 | `PATCH`| `/notifications/:id/read` | Authenticated | Mark a single notification as read |
@@ -589,6 +598,9 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 | `GET` | `/analytics/vendor/overview` | `VENDOR` | Store GMV, net payout (90%), top 5 selling items, store rating |
 | `GET` | `/analytics/vendor/sales-trend` | `VENDOR` | Time-series sales trend (daily/weekly) for charting |
 | `GET` | `/analytics/vendor/payment-breakdown`| `VENDOR` | Payment method breakdown (Cash, Razorpay Online, Wallet) |
+| `GET` | `/analytics/vendor/product-sales` | `VENDOR` | Detailed product-wise sales breakdown with units and gross revenue |
+| `GET` | `/analytics/vendor/customer-sales` | `VENDOR` | Customer purchasing analysis with order count and lifetime spend |
+| `GET` | `/analytics/vendor/rider-performance` | `VENDOR` | Delivery partner performance report with completion rate & avg time |
 
 
 ### 12. Support & Issue Tickets Module (`/api/v1/support`)
@@ -617,8 +629,8 @@ Every phase includes an automated end-to-end integration test suite located in `
 | **Phase 6** | Payment Gateway, Razorpay & Double-Entry Wallet | `test-payment-flow.ts` | **46 / 46** | ✅ PASS |
 | **Phase 7** | Notifications (i18n EN/HI/MR), Reviews & Analytics | `test-phase7-flow.ts` | **111 / 111** | ✅ PASS |
 | **Phase 8** | Customer Onboarding, Custom Pricing, Handover, Support | `test-phase8-flow.ts` | **78 / 78** | ✅ PASS |
-| **Phase 8 (Gap Closures)** | Password Reset, Delivery Boy Fleet Roster, Stats, Analytics | `test-enhancements-flow.ts` | **53 / 53** | ✅ PASS |
-| **TOTAL** | **Full Platform Regression Suite (8 Phases + Enhancements)** | `npm run test:all` | **382 / 382** | **✅ 100% PASS** |
+| **Phase 8 (Gap Closures & Reports)** | Password Reset, Delivery Boy Fleet Roster, Stats, Preferences, Reports | `test-enhancements-flow.ts` | **69 / 69** | ✅ PASS |
+| **TOTAL** | **Full Platform Regression Suite (8 Phases + Complete Enhancements)** | `npm run test:all` | **398 / 398** | **✅ 100% PASS** |
 
 - **TypeScript Strict Compile (`npx tsc --noEmit`):** `0 errors`
 - **Production Bundle Build (`npm run build`):** `dist/ generated cleanly with 0 errors`

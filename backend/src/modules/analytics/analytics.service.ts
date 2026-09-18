@@ -471,4 +471,270 @@ export class AnalyticsService {
       };
     });
   }
+
+  /**
+   * 7. Vendor Detailed Report: Product-wise Sales Breakdown
+   */
+  public static async getVendorProductSalesReport(
+    vendorId: string,
+    period: string,
+    page: number = 1,
+    limit: number = 20,
+    startDate?: string,
+    endDate?: string
+  ): Promise<{
+    items: Array<{
+      productId: string;
+      productName: string;
+      categoryName: string;
+      sku: string;
+      unitsSold: number;
+      grossRevenue: number;
+      averagePrice: number;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const prodDateFilter = buildDateFilter(period, startDate, endDate, 'o.created_at', 2);
+    const offset = (page - 1) * limit;
+
+    // Count distinct products sold
+    const countRes = await query<{ count: string }>(
+      `SELECT COUNT(DISTINCT oi.product_id) AS count
+       FROM order_management.order_items oi
+       JOIN order_management.orders o ON o.id = oi.order_id
+       WHERE o.vendor_id = $1 AND o.status = 'DELIVERED' AND ${prodDateFilter.sql}`,
+      [vendorId, ...prodDateFilter.params]
+    );
+
+    const total = parseInt(countRes.rows[0]?.count || '0', 10);
+
+    const itemsRes = await query<{
+      product_id: string;
+      product_name: string;
+      category_name: string;
+      sku: string;
+      units_sold: string;
+      gross_revenue: string;
+    }>(
+      `SELECT
+         p.id AS product_id,
+         p.name AS product_name,
+         COALESCE(c.name, 'Uncategorized') AS category_name,
+         p.sku,
+         SUM(oi.quantity) AS units_sold,
+         SUM(oi.quantity * oi.unit_price) AS gross_revenue
+       FROM order_management.order_items oi
+       JOIN order_management.orders o ON o.id = oi.order_id
+       JOIN catalog.products p ON p.id = oi.product_id
+       LEFT JOIN catalog.categories c ON c.id = p.category_id
+       WHERE o.vendor_id = $1
+         AND o.status = 'DELIVERED'
+         AND ${prodDateFilter.sql}
+       GROUP BY p.id, p.name, c.name, p.sku
+       ORDER BY gross_revenue DESC
+       LIMIT $${prodDateFilter.params.length + 2} OFFSET $${prodDateFilter.params.length + 3}`,
+      [vendorId, ...prodDateFilter.params, limit, offset]
+    );
+
+    return {
+      items: itemsRes.rows.map((r) => {
+        const unitsSold = parseInt(r.units_sold || '0', 10);
+        const grossRevenue = parseFloat(r.gross_revenue || '0');
+        return {
+          productId: r.product_id,
+          productName: r.product_name,
+          categoryName: r.category_name,
+          sku: r.sku,
+          unitsSold,
+          grossRevenue,
+          averagePrice: unitsSold > 0 ? Math.round((grossRevenue / unitsSold) * 100) / 100 : 0,
+        };
+      }),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  /**
+   * 8. Vendor Detailed Report: Customer-wise Sales Breakdown
+   */
+  public static async getVendorCustomerSalesReport(
+    vendorId: string,
+    period: string,
+    page: number = 1,
+    limit: number = 20,
+    startDate?: string,
+    endDate?: string
+  ): Promise<{
+    items: Array<{
+      customerId: string;
+      customerName: string;
+      phone: string;
+      totalOrders: number;
+      totalSpend: number;
+      averageOrderValue: number;
+      lastOrderAt: string | null;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const custDateFilter = buildDateFilter(period, startDate, endDate, 'o.created_at', 2);
+    const offset = (page - 1) * limit;
+
+    const countRes = await query<{ count: string }>(
+      `SELECT COUNT(DISTINCT o.customer_id) AS count
+       FROM order_management.orders o
+       WHERE o.vendor_id = $1 AND o.status = 'DELIVERED' AND ${custDateFilter.sql}`,
+      [vendorId, ...custDateFilter.params]
+    );
+
+    const total = parseInt(countRes.rows[0]?.count || '0', 10);
+
+    const itemsRes = await query<{
+      customer_id: string;
+      first_name: string;
+      last_name: string;
+      phone: string;
+      total_orders: string;
+      total_spend: string;
+      last_order_at: string;
+    }>(
+      `SELECT
+         u.id AS customer_id,
+         u.first_name,
+         u.last_name,
+         u.phone,
+         COUNT(o.id) AS total_orders,
+         SUM(o.total_amount) AS total_spend,
+         MAX(o.created_at) AS last_order_at
+       FROM order_management.orders o
+       JOIN identity.users u ON u.id = o.customer_id
+       WHERE o.vendor_id = $1
+         AND o.status = 'DELIVERED'
+         AND ${custDateFilter.sql}
+       GROUP BY u.id, u.first_name, u.last_name, u.phone
+       ORDER BY total_spend DESC
+       LIMIT $${custDateFilter.params.length + 2} OFFSET $${custDateFilter.params.length + 3}`,
+      [vendorId, ...custDateFilter.params, limit, offset]
+    );
+
+    return {
+      items: itemsRes.rows.map((r) => {
+        const totalOrders = parseInt(r.total_orders || '0', 10);
+        const totalSpend = parseFloat(r.total_spend || '0');
+        return {
+          customerId: r.customer_id,
+          customerName: `${r.first_name} ${r.last_name}`.trim(),
+          phone: r.phone,
+          totalOrders,
+          totalSpend,
+          averageOrderValue: totalOrders > 0 ? Math.round((totalSpend / totalOrders) * 100) / 100 : 0,
+          lastOrderAt: r.last_order_at || null,
+        };
+      }),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  /**
+   * 9. Vendor Detailed Report: Rider-wise Delivery Performance
+   */
+  public static async getVendorRiderPerformanceReport(
+    vendorId: string,
+    period: string,
+    page: number = 1,
+    limit: number = 20,
+    startDate?: string,
+    endDate?: string
+  ): Promise<{
+    items: Array<{
+      riderId: string;
+      riderName: string;
+      phone: string;
+      vehicleType: string;
+      totalAssigned: number;
+      completedDeliveries: number;
+      failedDeliveries: number;
+      avgDeliveryMinutes: number;
+      completionRate: string;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const riderDateFilter = buildDateFilter(period, startDate, endDate, 'o.created_at', 2);
+    const offset = (page - 1) * limit;
+
+    const countRes = await query<{ count: string }>(
+      `SELECT COUNT(DISTINCT o.delivery_partner_id) AS count
+       FROM order_management.orders o
+       WHERE o.vendor_id = $1 AND o.delivery_partner_id IS NOT NULL AND ${riderDateFilter.sql}`,
+      [vendorId, ...riderDateFilter.params]
+    );
+
+    const total = parseInt(countRes.rows[0]?.count || '0', 10);
+
+    const itemsRes = await query<{
+      rider_id: string;
+      first_name: string;
+      last_name: string;
+      phone: string;
+      vehicle_type: string;
+      total_assigned: string;
+      completed_deliveries: string;
+      failed_deliveries: string;
+      avg_minutes: string;
+    }>(
+      `SELECT
+         dp.user_id AS rider_id,
+         u.first_name,
+         u.last_name,
+         u.phone,
+         COALESCE(dp.vehicle_type, 'MOTORCYCLE') AS vehicle_type,
+         COUNT(o.id) AS total_assigned,
+         COUNT(o.id) FILTER (WHERE o.status = 'DELIVERED') AS completed_deliveries,
+         COUNT(o.id) FILTER (WHERE o.delivery_status = 'FAILED') AS failed_deliveries,
+         ROUND(
+           AVG(EXTRACT(EPOCH FROM (o.completed_at - o.confirmed_at)) / 60)
+           FILTER (WHERE o.status = 'DELIVERED' AND o.completed_at IS NOT NULL AND o.confirmed_at IS NOT NULL),
+           1
+         ) AS avg_minutes
+       FROM delivery.delivery_partners dp
+       JOIN identity.users u ON u.id = dp.user_id
+       JOIN order_management.orders o ON o.delivery_partner_id = dp.user_id
+       WHERE o.vendor_id = $1 AND ${riderDateFilter.sql}
+       GROUP BY dp.user_id, u.first_name, u.last_name, u.phone, dp.vehicle_type
+       ORDER BY completed_deliveries DESC
+       LIMIT $${riderDateFilter.params.length + 2} OFFSET $${riderDateFilter.params.length + 3}`,
+      [vendorId, ...riderDateFilter.params, limit, offset]
+    );
+
+    return {
+      items: itemsRes.rows.map((r) => {
+        const totalAssigned = parseInt(r.total_assigned || '0', 10);
+        const completedDeliveries = parseInt(r.completed_deliveries || '0', 10);
+        return {
+          riderId: r.rider_id,
+          riderName: `${r.first_name} ${r.last_name}`.trim(),
+          phone: r.phone,
+          vehicleType: r.vehicle_type,
+          totalAssigned,
+          completedDeliveries,
+          failedDeliveries: parseInt(r.failed_deliveries || '0', 10),
+          avgDeliveryMinutes: parseFloat(r.avg_minutes || '0'),
+          completionRate:
+            totalAssigned > 0 ? ((completedDeliveries / totalAssigned) * 100).toFixed(1) + '%' : '0%',
+        };
+      }),
+      total,
+      page,
+      limit,
+    };
+  }
 }

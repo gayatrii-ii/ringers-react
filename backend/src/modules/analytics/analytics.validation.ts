@@ -23,6 +23,20 @@ export const vendorAnalyticsQuerySchema = z.object({
   }),
 });
 
+export const vendorReportPaginationQuerySchema = z.object({
+  query: dateRangeQuery.extend({
+    period: z.enum(['today', 'week', 'month', 'year', 'custom']).default('month'),
+    page: z
+      .string()
+      .transform((v) => Math.max(1, parseInt(v, 10) || 1))
+      .default('1'),
+    limit: z
+      .string()
+      .transform((v) => Math.min(100, Math.max(1, parseInt(v, 10) || 20)))
+      .default('20'),
+  }),
+});
+
 export const leaderboardQuerySchema = z.object({
   query: z.object({
     limit: z
