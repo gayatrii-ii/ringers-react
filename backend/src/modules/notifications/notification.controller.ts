@@ -138,4 +138,43 @@ export class NotificationController {
       next(error);
     }
   }
+
+  /**
+   * GET /api/v1/notifications/preferences
+   * Get user notification preferences
+   */
+  public static async getUserPreferences(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+
+      const result = await NotificationService.getUserPreferences(req.user.userId);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PUT /api/v1/notifications/preferences
+   * Update user notification preferences
+   */
+  public static async updateUserPreferences(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+
+      const result = await NotificationService.updateUserPreferences(req.user.userId, req.body);
+
+      res.status(200).json({
+        success: true,
+        message: 'Notification preferences updated successfully',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

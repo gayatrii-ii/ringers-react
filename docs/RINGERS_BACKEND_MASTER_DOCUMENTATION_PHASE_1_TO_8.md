@@ -1,7 +1,7 @@
 # Ringers Platform — Master Technical Documentation
 ### Complete Architectural & Engineering Reference: Phases 1 to 8 (Production-Ready)
-**Version:** 2.5.0 | **Date:** September 2026 | **Repository:** [https://github.com/gayatrii-ii/ringers-react](https://github.com/gayatrii-ii/ringers-react)  
-**Current Branch:** `main` (Merged & Verified: Commit `386e021` via PR #9)  
+**Version:** 2.6.0 | **Date:** September 2026 | **Repository:** [https://github.com/gayatrii-ii/ringers-react](https://github.com/gayatrii-ii/ringers-react)  
+**Active Production Branch:** `phase-8-enhancements-gap-fixes` (Synced & Pushed to GitHub)  
 **Core Team:** Karan Khot, Gayatri, Karansinh, Pradnya, Gauri
 
 ---
@@ -12,7 +12,7 @@
 2. [Technology Stack & Design Principles](#2-technology-stack--design-principles)
 3. [Project Directory & Codebase Layout](#3-project-directory--codebase-layout)
 4. [Phase-by-Phase Comprehensive Breakdown](#4-phase-by-phase-comprehensive-breakdown)
-   - [Phase 1: Database Architecture & PostgreSQL Migrations (16 Migrations)](#phase-1-database-architecture--postgresql-migrations)
+   - [Phase 1: Database Architecture & PostgreSQL Migrations (18 Migrations)](#phase-1-database-architecture--postgresql-migrations)
    - [Phase 2: Multi-Role Authentication, JWT Lifecycle & RBAC](#phase-2-multi-role-authentication-jwt-lifecycle--rbac)
    - [Phase 3A: Vendor Storefront Management & Hierarchical Catalog](#phase-3a-vendor-storefront-management--hierarchical-catalog)
    - [Phase 3B: Super Admin Governance, Key Engine & UPI Payments](#phase-3b-super-admin-governance-key-engine--upi-payments)
@@ -29,8 +29,8 @@
      - [8.6 Support & Issue Ticket System](#86-support--issue-ticket-system)
      - [8.7 Migration V17: Schema Extensions & Indexes](#87-migration-v17-schema-extensions--indexes)
      - [8.8 Production Readiness Gap Closures & Operational APIs](#88-production-readiness-gap-closures--operational-apis)
-5. [Complete Master API Reference (89+ Endpoints)](#5-complete-master-api-reference)
-6. [Automated Test Verification Report (382 / 382 Tests)](#6-automated-test-verification-report)
+5. [Complete Master API Reference (94+ Endpoints)](#5-complete-master-api-reference)
+6. [Automated Test Verification Report (398 / 398 Tests)](#6-automated-test-verification-report)
 7. [Git Branch & Merge History](#7-git-branch--merge-history)
 8. [Next Step 1: Production Environment Credentials Setup Guide](#8-next-step-1-production-environment-credentials-setup-guide)
    - [Razorpay Live Payment Gateway Keys & Webhooks](#1-razorpay-live-payment-gateway-keys--webhooks)
@@ -141,7 +141,7 @@ ringers-react/
 │   ├── package.json                       ← Scripts (`build`, `dev`, `lint`, `test:all`)
 │   └── tsconfig.json                      ← Strict TypeScript configuration
 ├── database/                              ← Database migrations
-│   └── db/migration/                      ← 17 Flyway SQL migrations (V1 to V17)
+│   └── db/migration/                      ← 18 Flyway SQL migrations (V1 to V18)
 └── docs/                                  ← Master documentation files
 ```
 
@@ -167,7 +167,7 @@ ringers-react/
 8. `notification`: In-app notification logs, push notification logs, and user device FCM tokens.
 9. `audit`: Platform-wide administrative audit trail logs.
 
-#### Complete Migration Inventory (V1 to V16)
+#### Complete Migration Inventory (V1 to V18)
 | Migration File | Tables & Structures Created | Core Purpose |
 |---|---|---|
 | `V1__init_extensions_and_schemas.sql` | `uuid-ossp`, `pgcrypto`, 9 Schemas | Enables UUID generator and schema boundaries |
@@ -186,6 +186,8 @@ ringers-react/
 | `V14__create_vendor_payment_and_admin_requests.sql` | `vendor_registration_requests`, `delivery_boy_job_requests`, UPI columns | Public onboarding forms and merchant UPI configuration |
 | `V15__extend_payment_tables.sql` | `wallets`, `wallet_transactions`, Razorpay columns | Double-entry wallet ledger and Razorpay metadata fields |
 | `V16__create_notification_analytics_review_tables.sql` | `user_device_tokens`, `reviews`, Scale Analytics Indexes | FCM push device registry, 1-5★ order reviews, scale indexes |
+| `V17__create_phase8_operational_tables.sql` | `support.tickets`, `vendor.customer_products`, `customer.registration_requests`, `vendor.referrals`, constraint extensions | Phase 8 operational workflows, vendor-controlled registration & pricing |
+| `V18__create_notification_preferences.sql` | `notification.user_preferences` | Granular user channel toggles (SMS, Push, Orders, Promotions) |
 
 ---
 
@@ -413,6 +415,13 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 - **8.8.7 Vendor Analytical Sales Trends & Payment Breakdown (`/api/v1/analytics`):**
   - `GET /analytics/vendor/sales-trend`: Daily/weekly sales time-series data for frontend revenue graph visualization.
   - `GET /analytics/vendor/payment-breakdown`: Order volume and gross revenue distribution across Cash on Delivery, Razorpay Online, and Wallet.
+- **8.8.8 Granular User Notification Preferences (`/api/v1/notifications`):**
+  - `GET /notifications/preferences`: Retrieves user toggle states for `orderUpdates`, `promotionalAlerts`, `deliveryStatus`, `smsEnabled`, and `pushEnabled`.
+  - `PUT /notifications/preferences`: Allows users to customize and disable non-critical notification channels.
+- **8.8.9 Detailed Vendor Line-Item & Performance Reporting (`/api/v1/analytics`):**
+  - `GET /analytics/vendor/product-sales`: Paginated report of all catalog products with quantity sold, gross revenue, and unit pricing.
+  - `GET /analytics/vendor/customer-sales`: Breakdown of top customers by total order frequency, lifetime spend, and last purchase date.
+  - `GET /analytics/vendor/rider-performance`: Detailed roster of delivery boys assigned to vendor with total trips, successful deliveries, failure counts, and average delivery duration.
 
 ---
 
@@ -424,8 +433,9 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 ### 1. Authentication Module (`/api/v1/auth`)
 | Method | Endpoint | Access / Role | Description |
 |---|---|---|---|
-| `POST` | `/auth/register` | Public | Register standard Customer account |
-| `POST` | `/auth/register/vendor` | Public (Requires Key) | Register Vendor account using Super Admin Private Key |
+| `POST` | `/auth/vendor/register` | Public (Requires Key) | Register Vendor account using Super Admin Private Key |
+| `POST` | `/customers/registration-requests` | Public | Flow B: Customer submits registration request for selected vendor |
+| `POST` | `/vendors/customers/initiate` | `VENDOR` | Flow A: Vendor initiates customer onboarding with OTP verification |
 | `POST` | `/auth/login` | Public | Authenticate user; returns JWT Access Token + Refresh Token |
 | `POST` | `/auth/send-otp` | Public | Generate and send cryptographic numeric OTP via SMS |
 | `POST` | `/auth/verify-otp` | Public | Verify OTP code with 5-attempt rate limiting |
@@ -566,6 +576,8 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 ### 9. Notifications Module (`/api/v1/notifications`)
 | Method | Endpoint | Access / Role | Description |
 |---|---|---|---|
+| `GET` | `/notifications/preferences` | Authenticated | View current notification preferences and enabled channels |
+| `PUT` | `/notifications/preferences` | Authenticated | Update notification toggles (`orderUpdates`, `promotions`, `sms`, `push`) |
 | `GET` | `/notifications` | Authenticated | Paginated in-app notification feed with unread filter |
 | `GET` | `/notifications/unread-count` | Authenticated | Quick badge count for app header & navigation bar |
 | `PATCH`| `/notifications/:id/read` | Authenticated | Mark a single notification as read |
@@ -589,6 +601,9 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 | `GET` | `/analytics/vendor/overview` | `VENDOR` | Store GMV, net payout (90%), top 5 selling items, store rating |
 | `GET` | `/analytics/vendor/sales-trend` | `VENDOR` | Time-series sales trend (daily/weekly) for charting |
 | `GET` | `/analytics/vendor/payment-breakdown`| `VENDOR` | Payment method breakdown (Cash, Razorpay Online, Wallet) |
+| `GET` | `/analytics/vendor/product-sales` | `VENDOR` | Detailed product-wise sales breakdown with units and gross revenue |
+| `GET` | `/analytics/vendor/customer-sales` | `VENDOR` | Customer purchasing analysis with order count and lifetime spend |
+| `GET` | `/analytics/vendor/rider-performance` | `VENDOR` | Delivery partner performance report with completion rate & avg time |
 
 
 ### 12. Support & Issue Tickets Module (`/api/v1/support`)
@@ -617,8 +632,8 @@ Every phase includes an automated end-to-end integration test suite located in `
 | **Phase 6** | Payment Gateway, Razorpay & Double-Entry Wallet | `test-payment-flow.ts` | **46 / 46** | ✅ PASS |
 | **Phase 7** | Notifications (i18n EN/HI/MR), Reviews & Analytics | `test-phase7-flow.ts` | **111 / 111** | ✅ PASS |
 | **Phase 8** | Customer Onboarding, Custom Pricing, Handover, Support | `test-phase8-flow.ts` | **78 / 78** | ✅ PASS |
-| **Phase 8 (Gap Closures)** | Password Reset, Delivery Boy Fleet Roster, Stats, Analytics | `test-enhancements-flow.ts` | **53 / 53** | ✅ PASS |
-| **TOTAL** | **Full Platform Regression Suite (8 Phases + Enhancements)** | `npm run test:all` | **382 / 382** | **✅ 100% PASS** |
+| **Phase 8 (Gap Closures & Reports)** | Password Reset, Delivery Boy Fleet Roster, Stats, Preferences, Reports | `test-enhancements-flow.ts` | **69 / 69** | ✅ PASS |
+| **TOTAL** | **Full Platform Regression Suite (8 Phases + Complete Enhancements)** | `npm run test:all` | **398 / 398** | **✅ 100% PASS** |
 
 - **TypeScript Strict Compile (`npx tsc --noEmit`):** `0 errors`
 - **Production Bundle Build (`npm run build`):** `dist/ generated cleanly with 0 errors`
@@ -639,7 +654,8 @@ All development was performed on dedicated feature branches, verified with autom
 | `phase-6-payment-and-wallet` | PR #6 | Team | Phase 6: Razorpay gateway, Webhooks, Wallet ledger, Vendor payouts |
 | `phase-7-notifications-analytics-and-reviews` | PR #7 | Team | Phase 7: i18n notifications, Customer reviews, Analytics dashboards |
 | `phase-8-missing-backend-delivery-and-auth-flows` | PR #9 | Karan | Phase 8: Operational flows, dual onboarding, pricing, delivery handover, referrals, support |
-| **`main`** | — | — | **Stable Production Branch (Latest Commit: `386e021`)** |
+| **`phase-8-enhancements-gap-fixes`** | Active | Karan | Phase 8B: 5 Missing APIs (Notification Preferences, Product Sales Report, Customer Sales Report, Rider Performance Report), V18 Migration, 149 Endpoints, 398/398 Tests |
+| **`main`** | Merged | Team | **Stable Production Base (PR #9)** |
 
 ---
 

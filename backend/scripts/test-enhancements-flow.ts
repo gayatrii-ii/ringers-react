@@ -34,7 +34,12 @@ import {
 
 import {
   vendorAnalyticsQuerySchema,
+  vendorReportPaginationQuerySchema,
 } from '../src/modules/analytics/analytics.validation.js';
+
+import {
+  updateNotificationPreferencesSchema,
+} from '../src/modules/notifications/notification.validation.js';
 
 import { createApp } from '../src/app.js';
 
@@ -360,8 +365,77 @@ async function runEnhancementsSuite() {
     assert(hasRoute(/DELETE.*\/customers\/profile\/me/), 'Route DELETE /customers/profile/me mounted');
     assert(hasRoute(/GET.*\/analytics\/vendor\/sales-trend/), 'Route GET /analytics/vendor/sales-trend mounted');
     assert(hasRoute(/GET.*\/analytics\/vendor\/payment-breakdown/), 'Route GET /analytics/vendor/payment-breakdown mounted');
+    assert(hasRoute(/GET.*\/notifications\/preferences/), 'Route GET /notifications/preferences mounted');
+    assert(hasRoute(/PUT.*\/notifications\/preferences/), 'Route PUT /notifications/preferences mounted');
+    assert(hasRoute(/GET.*\/analytics\/vendor\/product-sales/), 'Route GET /analytics/vendor/product-sales mounted');
+    assert(hasRoute(/GET.*\/analytics\/vendor\/customer-sales/), 'Route GET /analytics/vendor/customer-sales mounted');
+    assert(hasRoute(/GET.*\/analytics\/vendor\/rider-performance/), 'Route GET /analytics/vendor/rider-performance mounted');
 
     console.log(`  ℹ️ Total mounted Express endpoints in application: ${routes.length}`);
+  }
+
+  // ==========================================
+  // 9. Notification Preferences Schema Verification
+  // ==========================================
+  console.log('\n9. Notification Preferences Schemas');
+  {
+    const validPrefs = updateNotificationPreferencesSchema.safeParse({
+      body: {
+        orderUpdates: true,
+        promotionalAlerts: false,
+        smsEnabled: true,
+        pushEnabled: true,
+      },
+    });
+    assert(validPrefs.success, 'updateNotificationPreferencesSchema accepts valid preference toggles');
+
+    const emptyBody = updateNotificationPreferencesSchema.safeParse({
+      body: {},
+    });
+    assert(emptyBody.success, 'updateNotificationPreferencesSchema accepts empty body for partial updates');
+
+    const invalidType = updateNotificationPreferencesSchema.safeParse({
+      body: {
+        orderUpdates: 'invalid-string',
+      },
+    });
+    assert(!invalidType.success, 'updateNotificationPreferencesSchema rejects non-boolean value');
+  }
+
+  // ==========================================
+  // 10. Detailed Vendor Report Schemas Verification
+  // ==========================================
+  console.log('\n10. Detailed Vendor Report Schemas');
+  {
+    const validReportQuery = vendorReportPaginationQuerySchema.safeParse({
+      query: {
+        period: 'month',
+        page: '2',
+        limit: '15',
+      },
+    });
+    assert(validReportQuery.success, 'vendorReportPaginationQuerySchema accepts valid pagination and period');
+    if (validReportQuery.success) {
+      assert(validReportQuery.data.query.page === 2, 'Report page transformed to integer 2');
+      assert(validReportQuery.data.query.limit === 15, 'Report limit transformed to integer 15');
+    }
+
+    const defaultReportQuery = vendorReportPaginationQuerySchema.safeParse({
+      query: {},
+    });
+    assert(defaultReportQuery.success, 'vendorReportPaginationQuerySchema accepts empty query with defaults');
+    if (defaultReportQuery.success) {
+      assert(defaultReportQuery.data.query.page === 1, 'Default report page is 1');
+      assert(defaultReportQuery.data.query.limit === 20, 'Default report limit is 20');
+      assert(defaultReportQuery.data.query.period === 'month', 'Default report period is month');
+    }
+
+    const invalidPeriod = vendorReportPaginationQuerySchema.safeParse({
+      query: {
+        period: 'biweekly',
+      },
+    });
+    assert(!invalidPeriod.success, 'vendorReportPaginationQuerySchema rejects unsupported period');
   }
 
   // ==========================================

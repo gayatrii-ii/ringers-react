@@ -255,4 +255,164 @@ export class NotificationService {
 
     return { recipientCount: users.length };
   }
+
+  /**
+   * 9. Get user notification preferences
+   */
+  public static async getUserPreferences(userId: string): Promise<{
+    userId: string;
+    orderUpdates: boolean;
+    promotionalAlerts: boolean;
+    deliveryStatus: boolean;
+    smsEnabled: boolean;
+    pushEnabled: boolean;
+    emailEnabled: boolean;
+  }> {
+    const res = await query<{
+      user_id: string;
+      order_updates: boolean;
+      promotional_alerts: boolean;
+      delivery_status: boolean;
+      sms_enabled: boolean;
+      push_enabled: boolean;
+      email_enabled: boolean;
+    }>(
+      `SELECT user_id, order_updates, promotional_alerts, delivery_status, sms_enabled, push_enabled, email_enabled
+       FROM notification.user_preferences
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (res.rows.length === 0 || !res.rows[0]) {
+      // Lazy initialize default preferences
+      const initRes = await query<{
+        user_id: string;
+        order_updates: boolean;
+        promotional_alerts: boolean;
+        delivery_status: boolean;
+        sms_enabled: boolean;
+        push_enabled: boolean;
+        email_enabled: boolean;
+      }>(
+        `INSERT INTO notification.user_preferences (user_id)
+         VALUES ($1)
+         ON CONFLICT (user_id) DO NOTHING
+         RETURNING user_id, order_updates, promotional_alerts, delivery_status, sms_enabled, push_enabled, email_enabled`,
+        [userId]
+      );
+
+      const row = initRes.rows[0] || {
+        user_id: userId,
+        order_updates: true,
+        promotional_alerts: true,
+        delivery_status: true,
+        sms_enabled: true,
+        push_enabled: true,
+        email_enabled: false,
+      };
+
+      return {
+        userId: row.user_id,
+        orderUpdates: row.order_updates,
+        promotionalAlerts: row.promotional_alerts,
+        deliveryStatus: row.delivery_status,
+        smsEnabled: row.sms_enabled,
+        pushEnabled: row.push_enabled,
+        emailEnabled: row.email_enabled,
+      };
+    }
+
+    const row = res.rows[0];
+    return {
+      userId: row.user_id,
+      orderUpdates: row.order_updates,
+      promotionalAlerts: row.promotional_alerts,
+      deliveryStatus: row.delivery_status,
+      smsEnabled: row.sms_enabled,
+      pushEnabled: row.push_enabled,
+      emailEnabled: row.email_enabled,
+    };
+  }
+
+  /**
+   * 10. Update user notification preferences
+   */
+  public static async updateUserPreferences(
+    userId: string,
+    prefs: {
+      orderUpdates?: boolean;
+      promotionalAlerts?: boolean;
+      deliveryStatus?: boolean;
+      smsEnabled?: boolean;
+      pushEnabled?: boolean;
+      emailEnabled?: boolean;
+    }
+  ): Promise<{
+    userId: string;
+    orderUpdates: boolean;
+    promotionalAlerts: boolean;
+    deliveryStatus: boolean;
+    smsEnabled: boolean;
+    pushEnabled: boolean;
+    emailEnabled: boolean;
+  }> {
+    // Ensure row exists
+    await this.getUserPreferences(userId);
+
+    const updates: string[] = ['updated_at = CURRENT_TIMESTAMP'];
+    const params: unknown[] = [userId];
+    let pIdx = 2;
+
+    if (prefs.orderUpdates !== undefined) {
+      updates.push(`order_updates = $${pIdx++}`);
+      params.push(prefs.orderUpdates);
+    }
+    if (prefs.promotionalAlerts !== undefined) {
+      updates.push(`promotional_alerts = $${pIdx++}`);
+      params.push(prefs.promotionalAlerts);
+    }
+    if (prefs.deliveryStatus !== undefined) {
+      updates.push(`delivery_status = $${pIdx++}`);
+      params.push(prefs.deliveryStatus);
+    }
+    if (prefs.smsEnabled !== undefined) {
+      updates.push(`sms_enabled = $${pIdx++}`);
+      params.push(prefs.smsEnabled);
+    }
+    if (prefs.pushEnabled !== undefined) {
+      updates.push(`push_enabled = $${pIdx++}`);
+      params.push(prefs.pushEnabled);
+    }
+    if (prefs.emailEnabled !== undefined) {
+      updates.push(`email_enabled = $${pIdx++}`);
+      params.push(prefs.emailEnabled);
+    }
+
+    const res = await query<{
+      user_id: string;
+      order_updates: boolean;
+      promotional_alerts: boolean;
+      delivery_status: boolean;
+      sms_enabled: boolean;
+      push_enabled: boolean;
+      email_enabled: boolean;
+    }>(
+      `UPDATE notification.user_preferences
+       SET ${updates.join(', ')}
+       WHERE user_id = $1
+       RETURNING user_id, order_updates, promotional_alerts, delivery_status, sms_enabled, push_enabled, email_enabled`,
+      params
+    );
+
+    const row = res.rows[0]!;
+    return {
+      userId: row.user_id,
+      orderUpdates: row.order_updates,
+      promotionalAlerts: row.promotional_alerts,
+      deliveryStatus: row.delivery_status,
+      smsEnabled: row.sms_enabled,
+      pushEnabled: row.push_enabled,
+      emailEnabled: row.email_enabled,
+    };
+  }
 }

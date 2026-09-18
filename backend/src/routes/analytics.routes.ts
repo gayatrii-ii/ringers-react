@@ -7,6 +7,7 @@ import { ROLES } from '../constants/roles.js';
 import {
   adminAnalyticsQuerySchema,
   vendorAnalyticsQuerySchema,
+  vendorReportPaginationQuerySchema,
   leaderboardQuerySchema,
 } from '../modules/analytics/analytics.validation.js';
 
@@ -61,6 +62,30 @@ router.get(
   requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
   validate(vendorAnalyticsQuerySchema),
   AnalyticsController.getVendorPaymentBreakdown
+);
+
+// 7. Vendor: Detailed Product-wise Sales Report
+router.get(
+  '/vendor/product-sales',
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(vendorReportPaginationQuerySchema),
+  AnalyticsController.getVendorProductSales
+);
+
+// 8. Vendor: Detailed Customer-wise Sales Report
+router.get(
+  '/vendor/customer-sales',
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(vendorReportPaginationQuerySchema),
+  AnalyticsController.getVendorCustomerSales
+);
+
+// 9. Vendor: Detailed Rider-wise Delivery Performance Report
+router.get(
+  '/vendor/rider-performance',
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(vendorReportPaginationQuerySchema),
+  AnalyticsController.getVendorRiderPerformance
 );
 
 export default router;
