@@ -1,7 +1,7 @@
 # Ringers Platform — Master Technical Documentation
-### Complete Architectural & Engineering Reference: Phases 1 to 8 (Production-Ready)
-**Version:** 2.6.0 | **Date:** September 2026 | **Repository:** [https://github.com/gayatrii-ii/ringers-react](https://github.com/gayatrii-ii/ringers-react)  
-**Active Production Branch:** `phase-8-enhancements-gap-fixes` (Synced & Pushed to GitHub)  
+### Complete Architectural & Engineering Reference: Phases 1 to 15 (Production-Ready)
+**Version:** 3.0.0 | **Date:** September 2026 | **Repository:** [https://github.com/gayatrii-ii/ringers-react](https://github.com/gayatrii-ii/ringers-react)  
+**Active Production Branch:** `main` (Fully Merged & Synced with GitHub)  
 **Core Team:** Karan Khot, Gayatri, Karansinh, Pradnya, Gauri
 
 ---
@@ -12,7 +12,7 @@
 2. [Technology Stack & Design Principles](#2-technology-stack--design-principles)
 3. [Project Directory & Codebase Layout](#3-project-directory--codebase-layout)
 4. [Phase-by-Phase Comprehensive Breakdown](#4-phase-by-phase-comprehensive-breakdown)
-   - [Phase 1: Database Architecture & PostgreSQL Migrations (18 Migrations)](#phase-1-database-architecture--postgresql-migrations)
+   - [Phase 1: Database Architecture & PostgreSQL Migrations (19 Migrations)](#phase-1-database-architecture--postgresql-migrations)
    - [Phase 2: Multi-Role Authentication, JWT Lifecycle & RBAC](#phase-2-multi-role-authentication-jwt-lifecycle--rbac)
    - [Phase 3A: Vendor Storefront Management & Hierarchical Catalog](#phase-3a-vendor-storefront-management--hierarchical-catalog)
    - [Phase 3B: Super Admin Governance, Key Engine & UPI Payments](#phase-3b-super-admin-governance-key-engine--upi-payments)
@@ -21,31 +21,19 @@
    - [Phase 6: Payment Gateway, Razorpay Integration & Double-Entry Wallet](#phase-6-payment-gateway-razorpay-integration--double-entry-wallet)
    - [Phase 7: Multi-Language Notifications (i18n EN/HI/MR), Customer Reviews & Analytics](#phase-7-multi-language-notifications-i18n-enhimr-customer-reviews--analytics)
    - [Phase 8: Operational Flows, Customer Onboarding & Delivery Execution](#phase-8-operational-flows-customer-onboarding--delivery-execution)
-     - [8.1 Customer Dual-Flow Onboarding (Flow A & Flow B)](#81-customer-dual-flow-onboarding)
-     - [8.2 Customer-Specific Products & Custom Pricing Engine](#82-customer-specific-products--custom-pricing-engine)
-     - [8.3 Vendor-Only Delivery Dispatch & Fleet Handover Lifecycle](#83-vendor-only-delivery-dispatch--fleet-handover-lifecycle)
-     - [8.4 Connected Delivery Boy Job Application Pipeline](#84-connected-delivery-boy-job-application-pipeline)
-     - [8.5 Vendor Referral Program & Rewards](#85-vendor-referral-program--rewards)
-     - [8.6 Support & Issue Ticket System](#86-support--issue-ticket-system)
-     - [8.7 Migration V17: Schema Extensions & Indexes](#87-migration-v17-schema-extensions--indexes)
-     - [8.8 Production Readiness Gap Closures & Operational APIs](#88-production-readiness-gap-closures--operational-apis)
-5. [Complete Master API Reference (94+ Endpoints)](#5-complete-master-api-reference)
-6. [Automated Test Verification Report (398 / 398 Tests)](#6-automated-test-verification-report)
+   - [Phase 9 to 15: Platform Specification Gaps & High-Scale Enhancements](#phase-9-to-15-platform-specification-gaps--high-scale-enhancements)
+     - [Phase 9: Flow A Direct Delivery Boy Creation & Vendor Password Reset](#phase-9-flow-a-direct-delivery-boy-creation--vendor-password-reset)
+     - [Phase 10: Order Reassignment, COD Auto-Settlement & Live Navigation](#phase-10-order-reassignment-cod-auto-settlement--live-navigation)
+     - [Phase 11: Wallet 4-Digit PIN Security, History, Refund Eligibility & Admin Customer Suspension](#phase-11-wallet-4-digit-pin-security-history-refund-eligibility--admin-customer-suspension)
+     - [Phase 12: Multi-Lingual Settings, Self-Account Deletion & Activity Breakdowns](#phase-12-multi-lingual-settings-self-account-deletion--activity-breakdowns)
+     - [Phase 13: Vendor Support Desk, Tri-lingual Policies & Public Applicant Tracking](#phase-13-vendor-support-desk-tri-lingual-policies--public-applicant-tracking)
+     - [Phase 14: Super Admin Vendor 360, Sales & Orders Reports](#phase-14-super-admin-vendor-360-sales--orders-reports)
+     - [Phase 15: PostgreSQL Migration V19](#phase-15-postgresql-migration-v19)
+5. [Complete Master API Reference (118+ Endpoints)](#5-complete-master-api-reference)
+6. [Automated Test Verification Report (554 / 554 Tests)](#6-automated-test-verification-report)
 7. [Git Branch & Merge History](#7-git-branch--merge-history)
 8. [Next Step 1: Production Environment Credentials Setup Guide](#8-next-step-1-production-environment-credentials-setup-guide)
-   - [Razorpay Live Payment Gateway Keys & Webhooks](#1-razorpay-live-payment-gateway-keys--webhooks)
-   - [Firebase Cloud Messaging (FCM) Service Account](#2-firebase-cloud-messaging-fcm-service-account)
-   - [Transactional Email Gateway (SendGrid / AWS SES / Gmail)](#3-transactional-email-gateway)
-   - [SMS Gateway (Twilio / Fast2SMS)](#4-sms-gateway)
-   - [Free Map Services Configuration](#5-free-map-services-configuration)
-   - [Cloudinary Media Storage](#6-cloudinary-media-storage)
-   - [PostgreSQL Production Database & JWT Secrets](#7-postgresql-production-database--jwt-secrets)
-   - [Step-by-Step Guide to Updating `.env` & Dependent Backend Files](#8-step-by-step-guide-to-updating-env--dependent-backend-files)
 9. [Next Step 2: Frontend Applications Implementation Plan](#9-next-step-2-frontend-applications-implementation-plan)
-   - [Customer Mobile & Web Application](#app-1-customer-mobile--web-application)
-   - [Vendor Storefront Management Portal](#app-2-vendor-storefront-management-portal)
-   - [Delivery Partner Fleet Mobile Application](#app-3-delivery-partner-fleet-mobile-application)
-   - [Super Admin Operations Control Center](#app-4-super-admin-operations-control-center)
 
 ---
 
@@ -423,6 +411,59 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
   - `GET /analytics/vendor/customer-sales`: Breakdown of top customers by total order frequency, lifetime spend, and last purchase date.
   - `GET /analytics/vendor/rider-performance`: Detailed roster of delivery boys assigned to vendor with total trips, successful deliveries, failure counts, and average delivery duration.
 
+### Phase 9 to 15: Platform Specification Gaps & High-Scale Enhancements
+
+To achieve 100% parity with the 31-page business specification for 10,000+ users and 20+ multi-tenant vendors, Phases 9 to 15 closed all remaining functional gaps:
+
+#### Phase 9: Flow A Direct Delivery Boy Creation & Vendor Password Reset
+- **Direct Rider Account Creation (Flow A):** `POST /api/v1/vendors/delivery-boys` allows merchants to directly create delivery boy accounts with name, mobile, email, temporary password, vehicle type (`BIKE`, `SCOOTER`, `CYCLE`, `ELECTRIC_VEHICLE`), and driving license.
+- **Vendor-Managed Rider Password Reset:** `PATCH /api/v1/vendors/delivery-boys/:riderId/reset-password` enables vendors to reset rider passwords without admin intervention, revoking all active sessions.
+
+#### Phase 10: Order Reassignment, COD Auto-Settlement & Live Navigation
+- **Transaction-Safe Order Reassignment:** `POST /api/v1/orders/:id/reassign-delivery` permits reassigning in-transit orders if the current rider faces a breakdown or delay. Previous assignment is marked `REASSIGNED` and order delivery status is cleanly preserved.
+- **Cash On Delivery (COD) Auto-Settlement:** Upon customer delivery OTP confirmation (`POST /delivery/orders/:id/complete-delivery` or `POST /orders/:id/confirm-delivery`), `CASH_ON_DELIVERY` and `CASH` orders automatically transition to `payment_status = 'PAID'`. This triggers accurate vendor wallet credit (90% GMV) without manual admin reconciliations.
+- **Live Google Maps Navigation & Customer Photo:** `GET /api/v1/orders/:id/tracking` returns pre-formatted `googleMapsNavigationUrl` for instant turn-by-turn navigation in Android/iOS maps alongside the customer profile photo for seamless rider drop-off verification.
+
+#### Phase 11: Wallet 4-Digit PIN Security, History, Refund Eligibility & Admin Customer Suspension
+- **Wallet 4-Digit Security PIN:** 
+  - `POST /api/v1/payments/wallet/pin`: Setup initial 4-digit numeric wallet PIN (hashed with bcrypt cost factor 10).
+  - `PATCH /api/v1/payments/wallet/pin`: Secure PIN change requiring current PIN validation.
+  - `POST /api/v1/payments/wallet/pay`: Enforces 4-digit PIN verification before debiting customer wallet balance.
+- **Unified Payment History:** `GET /api/v1/payments/my-history` merges all gateway payments, top-ups, refunds, and wallet transactions into a single chronologically sorted ledger.
+- **Refund Eligibility Pre-Check:** `GET /api/v1/payments/refund-eligibility/:orderId` inspects order payment status and cancellation state before initiating refunds.
+- **Super Admin Customer Suspension:** `PATCH /api/v1/admin/customers/:id/status` allows administrators to suspend fraudulent or delinquent customer accounts (`ACTIVE` / `SUSPENDED`) and immediately revoke their JWT refresh tokens.
+- **Hardened Order Cancellation:** Cancellations are rejected with `400 Bad Request` if an order is already `OUT_FOR_DELIVERY` or `DELIVERED`.
+
+#### Phase 12: Multi-Lingual Settings, Self-Account Deletion & Activity Breakdowns
+- **Vendor & Rider Preferred UI Language:** `PATCH /api/v1/vendors/profile/me/language` and `PATCH /api/v1/delivery/profile/language` persist English (`EN`), Hindi (`HI`), and Marathi (`MR`) preferences.
+- **Self-Account Deletion Guardrails:**
+  - `DELETE /api/v1/vendors/profile/me`: Soft-deletes vendor account, strictly blocked if pending or live orders exist.
+  - `DELETE /api/v1/delivery/profile/me`: Soft-deletes rider account, strictly blocked if active delivery assignments are underway.
+- **Customer Activity & Spending Analytics:** `GET /api/v1/customers/me/dashboard-stats` enriched with failed orders count, lifetime wallet spent, and payment method distribution.
+
+#### Phase 13: Vendor Support Desk, Tri-lingual Policies & Public Applicant Tracking
+- **Vendor Support Desk Portal:** 
+  - `GET /api/v1/support/vendor/tickets`: Vendors view tickets specifically related to orders placed with their store.
+  - `PATCH /api/v1/support/vendor/tickets/:id/respond`: Merchants record official responses to customer tickets.
+  - Ticket categories expanded to include `ACCOUNT_ISSUE` and `WALLET_ISSUE`.
+- **Public Tri-Lingual Legal Policies:** `GET /api/v1/public/policies/:policyType?lang=EN|HI|MR` serves dynamically rendered Privacy Policy, Terms & Conditions, Cancellation Policy, and Refund Policy in English, Hindi, and Marathi.
+- **Public Applicant Status Lookup:** `GET /api/v1/public/vendor-request/status` and `GET /api/v1/public/delivery-job-request/status` allow prospective vendors and riders to query their application status (`PENDING`, `APPROVED`, `REJECTED`, `CONNECTED`) via their 10-digit mobile number.
+
+#### Phase 14: Super Admin Vendor 360, Sales & Orders Reports
+- **Vendor 360° Comprehensive Profile:** `GET /api/v1/analytics/admin/vendors/:vendorId/overview` returns an aggregated view of store metadata, owner contacts, lifetime GMV, catalog size, active wallet balance, and support history.
+- **Super Admin Vendor Sales Report:** `GET /api/v1/analytics/admin/vendor-sales-report` provides vendor-wise sales volume, completed orders, cancellations, and platform commission breakdown.
+- **Super Admin Platform Orders Report:** `GET /api/v1/analytics/admin/platform-orders-report` delivers paginated order records with multi-dimensional filtering by date period, vendor, and order status.
+- **Delivery Query Schema Correction:** Standardized queries to join `delivery.delivery_profiles` and `delivery.delivery_assignments`, eliminating deprecated table references.
+
+#### Phase 15: PostgreSQL Migration V19
+- **Migration:** `database/db/migration/V19__add_wallet_pin_and_platform_features.sql`
+- **Schema Updates:**
+  1. `payment.wallets`: Added `wallet_pin_hash VARCHAR(255)`.
+  2. `support.tickets`: Extended category check to include `ACCOUNT_ISSUE` and `WALLET_ISSUE`; added `vendor_id UUID REFERENCES vendor.vendors(id)`, `vendor_response TEXT`, and `vendor_responded_at TIMESTAMPTZ`.
+  3. `delivery.delivery_assignments`: Status check extended to support `REASSIGNED`.
+  4. `vendor.vendors` & `delivery.delivery_profiles`: Added `preferred_language VARCHAR(5) DEFAULT 'EN'`.
+  5. High-performance composite indexes on `identity.users(status)`, `orders(customer_id, status)`, `orders(vendor_id, status)`, and `orders(payment_method)`.
+
 ---
 
 ## 5. Complete Master API Reference
@@ -479,6 +520,10 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 | `GET` | `/vendors/referral` | `VENDOR` | Get vendor referral dashboard profile, metrics, and invite code |
 | `POST` | `/vendors/referrals/invite` | `VENDOR` | Invite prospective merchant via phone or email |
 | `GET` | `/vendors/referrals` | `VENDOR` | List all referrals dispatched by vendor |
+| `POST` | `/vendors/delivery-boys` | `VENDOR` | Flow A: Merchant directly creates delivery boy account |
+| `PATCH`| `/vendors/delivery-boys/:riderId/reset-password` | `VENDOR` | Merchant resets delivery boy password & revokes tokens |
+| `PATCH`| `/vendors/profile/me/language` | `VENDOR` | Update merchant UI language preference (`EN`, `HI`, `MR`) |
+| `DELETE`| `/vendors/profile/me` | `VENDOR` | Soft-deactivate vendor account (blocked if orders active) |
 
 ### 3. Categories & Catalog (`/api/v1/categories`, `/api/v1/products`)
 | Method | Endpoint | Access / Role | Description |
@@ -508,8 +553,13 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 | `PATCH`| `/admin/delivery-boy-requests/:id/assign` | `SUPER_ADMIN` | Approve rider and link to vendor's delivery fleet |
 | `GET` | `/admin/referrals` | `SUPER_ADMIN` | List all merchant referrals across platform |
 | `PATCH`| `/admin/referrals/:id/reward` | `SUPER_ADMIN` | Approve, pay, or cancel referral reward amount |
+| `GET` | `/admin/vendors` | `SUPER_ADMIN` | Search, filter, and inspect registered platform vendors |
+| `PATCH`| `/admin/customers/:id/status` | `SUPER_ADMIN` | Suspend or activate customer account & revoke tokens |
 | `POST` | `/public/vendor-request` | Public | Open form for merchants to apply for onboarding |
 | `POST` | `/public/delivery-job-request` | Public | Open form for delivery riders to apply for jobs |
+| `GET` | `/public/vendor-request/status` | Public | Look up merchant application status via mobile number |
+| `GET` | `/public/delivery-job-request/status` | Public | Look up rider job application status via mobile number |
+| `GET` | `/public/policies/:policyType` | Public | Tri-lingual policy viewer (`privacy-policy`, `terms-conditions`, `refund-policy`) |
 
 ### 5. Customer Profile & Address Book (`/api/v1/customers`)
 | Method | Endpoint | Access / Role | Description |
@@ -544,19 +594,23 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 | `GET` | `/delivery/track/:id` | Authenticated | Real-time order tracking with driver info and latest GPS beacon |
 | `GET` | `/delivery/admin/riders` | `SUPER_ADMIN` | List all platform delivery partners with status filters |
 | `PATCH`| `/delivery/admin/riders/:id/status` | `SUPER_ADMIN` | Administrative rider suspension or status override |
+| `PATCH`| `/delivery/profile/language` | `DELIVERY_BOY` | Update rider UI language preference (`EN`, `HI`, `MR`) |
+| `DELETE`| `/delivery/profile/me` | `DELIVERY_BOY` | Self-deactivate rider account (blocked if assignment active) |
 
 ### 7. Cart & Order Management (`/api/v1/orders`)
 | Method | Endpoint | Access / Role | Description |
 |---|---|---|---|
 | `POST` | `/orders/calculate` | `CUSTOMER` | Validates cart, calculates GST taxes, and computes GPS distance fee |
-| `POST` | `/orders` | `CUSTOMER` | Places order with immutable JSON price & address snapshots |
+| `POST` | `/orders` | `CUSTOMER` | Places order with immutable JSON price & address snapshots (COD, WALLET, ONLINE) |
 | `GET` | `/orders/my-orders` | `CUSTOMER` | Paginated customer past and active order history |
 | `GET` | `/orders/vendor/live` | `VENDOR` | Live merchant order desk (`PENDING`, `PREPARING`, `READY`) |
 | `GET` | `/orders/admin/all` | `SUPER_ADMIN` | Global platform-wide order monitor with filters |
 | `GET` | `/orders/:id` | Authenticated | Scoped receipt view with timeline audit history |
+| `GET` | `/orders/:id/tracking` | Authenticated | Real-time order tracking with customer photo & Google Maps navigation link |
 | `PATCH`| `/orders/:id/status` | Multi-Role | State machine transition (`CONFIRMED`, `PREPARING`, `READY`, etc.) |
-| `PATCH`| `/orders/:id/cancel` | Authenticated | Customer or Vendor order cancellation with reason |
+| `PATCH`| `/orders/:id/cancel` | Authenticated | Order cancellation (hardened to block if `OUT_FOR_DELIVERY` or `DELIVERED`) |
 | `POST` | `/orders/:id/assign-delivery` | `VENDOR` | Vendor assigns delivery rider to order (Vendor-only authority) |
+| `POST` | `/orders/:id/reassign-delivery`| `VENDOR` / `ADMIN` | Reassign order to new rider with reason and transaction safety |
 | `POST` | `/orders/:id/confirm-delivery` | `CUSTOMER` | Path B: Customer directly confirms delivery received in app |
 
 ### 8. Payment Gateway & Wallet (`/api/v1/payments`, `/api/v1/wallet`)
@@ -566,11 +620,15 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 | `POST` | `/payments/verify` | `CUSTOMER` | Verifies Razorpay HMAC-SHA256 signature and marks order `PAID` |
 | `POST` | `/payments/webhook` | Public (HMAC) | Razorpay server-to-server webhook callback listener |
 | `GET` | `/payments/order/:orderId` | `CUSTOMER` / `ADMIN` | Get payment transaction history for a specific order |
+| `GET` | `/payments/my-history` | Authenticated | Unified payment, refund, and top-up transaction history |
+| `GET` | `/payments/refund-eligibility/:orderId` | Authenticated | Pre-check refund eligibility before initiating dispute |
 | `POST` | `/payments/refund` | `SUPER_ADMIN` | Triggers Razorpay refund and credits customer wallet |
 | `GET` | `/wallet/balance` | `CUSTOMER` / `VENDOR` | Get wallet balance (lazy initialization on first access) |
+| `POST` | `/wallet/pin` | Authenticated | Setup 4-digit security PIN for wallet checkout |
+| `PATCH`| `/wallet/pin` | Authenticated | Change 4-digit wallet security PIN |
 | `POST` | `/wallet/topup` | `CUSTOMER` | Initiates Razorpay payment order to top up wallet balance |
 | `POST` | `/wallet/topup/verify` | `CUSTOMER` | Verifies top-up signature and credits wallet balance atomically |
-| `POST` | `/wallet/pay` | `CUSTOMER` | Debits wallet balance to pay for order with row lock |
+| `POST` | `/wallet/pay` | `CUSTOMER` | Debits wallet balance to pay for order (requires 4-digit PIN) |
 | `GET` | `/wallet/transactions` | `CUSTOMER` / `VENDOR` | Paginated wallet transaction ledger (`CREDIT`/`DEBIT` filter) |
 
 ### 9. Notifications Module (`/api/v1/notifications`)
@@ -598,6 +656,9 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 | `GET` | `/analytics/admin/overview` | `SUPER_ADMIN` | Platform GMV, commission, refunds, net revenue, active users |
 | `GET` | `/analytics/admin/vendors-leaderboard`| `SUPER_ADMIN` | Top vendors ranked by sales revenue and orders |
 | `GET` | `/analytics/admin/delivery-performance`| `SUPER_ADMIN` | Fleet completion rates, average delivery minutes, top riders |
+| `GET` | `/analytics/admin/vendors/:vendorId/overview` | `SUPER_ADMIN` | Vendor 360° comprehensive store, sales, catalog, and wallet overview |
+| `GET` | `/analytics/admin/vendor-sales-report` | `SUPER_ADMIN` | Vendor-wise sales performance and commission reporting |
+| `GET` | `/analytics/admin/platform-orders-report` | `SUPER_ADMIN` | Platform-wide order analytics with date, status, and vendor filters |
 | `GET` | `/analytics/vendor/overview` | `VENDOR` | Store GMV, net payout (90%), top 5 selling items, store rating |
 | `GET` | `/analytics/vendor/sales-trend` | `VENDOR` | Time-series sales trend (daily/weekly) for charting |
 | `GET` | `/analytics/vendor/payment-breakdown`| `VENDOR` | Payment method breakdown (Cash, Razorpay Online, Wallet) |
@@ -605,13 +666,14 @@ To ensure 100% full-stack and mobile client readiness, 7 targeted operational wo
 | `GET` | `/analytics/vendor/customer-sales` | `VENDOR` | Customer purchasing analysis with order count and lifetime spend |
 | `GET` | `/analytics/vendor/rider-performance` | `VENDOR` | Delivery partner performance report with completion rate & avg time |
 
-
 ### 12. Support & Issue Tickets Module (`/api/v1/support`)
 | Method | Endpoint | Access / Role | Description |
 |---|---|---|---|
-| `POST` | `/support/tickets` | Authenticated | Submit new support ticket with category and priority |
+| `POST` | `/support/tickets` | Authenticated | Submit support ticket (`ORDER_ISSUE`, `PAYMENT_ISSUE`, `DELIVERY_ISSUE`, `ACCOUNT_ISSUE`, `WALLET_ISSUE`, `GENERAL`) |
 | `GET` | `/support/tickets/my` | Authenticated | View authenticated user's submitted support tickets |
 | `GET` | `/support/tickets/:id` | Authenticated | View single ticket details and resolution audit history |
+| `GET` | `/support/vendor/tickets` | `VENDOR` | View store-linked support tickets for merchant triage |
+| `PATCH`| `/support/vendor/tickets/:id/respond` | `VENDOR` | Vendor records merchant response to customer order ticket |
 | `GET` | `/support/admin/tickets` | `SUPER_ADMIN` / `ADMIN` | List all platform tickets with priority sorting |
 | `PATCH`| `/support/admin/tickets/:id/resolve` | `SUPER_ADMIN` / `ADMIN` | Resolve or close support ticket with recorded admin response |
 
@@ -632,11 +694,13 @@ Every phase includes an automated end-to-end integration test suite located in `
 | **Phase 6** | Payment Gateway, Razorpay & Double-Entry Wallet | `test-payment-flow.ts` | **46 / 46** | ✅ PASS |
 | **Phase 7** | Notifications (i18n EN/HI/MR), Reviews & Analytics | `test-phase7-flow.ts` | **111 / 111** | ✅ PASS |
 | **Phase 8** | Customer Onboarding, Custom Pricing, Handover, Support | `test-phase8-flow.ts` | **78 / 78** | ✅ PASS |
-| **Phase 8 (Gap Closures & Reports)** | Password Reset, Delivery Boy Fleet Roster, Stats, Preferences, Reports | `test-enhancements-flow.ts` | **69 / 69** | ✅ PASS |
-| **TOTAL** | **Full Platform Regression Suite (8 Phases + Complete Enhancements)** | `npm run test:all` | **398 / 398** | **✅ 100% PASS** |
+| **Phase 8 (Gap Closures)** | Password Reset, Delivery Fleet Roster, Preferences, Reports | `test-enhancements-flow.ts` | **69 / 69** | ✅ PASS |
+| **Phases 9 to 15 (Scale Suite)** | 22 Missing Features, 10,000+ Users & 20+ Vendors Stress Cycles | `test-production-scale-flow.ts` | **156 / 156** | ✅ PASS |
+| **TOTAL** | **Full Platform Regression Suite (Phases 1 to 15)** | `npm run test:all` | **554 / 554** | **✅ 100% PASS** |
 
 - **TypeScript Strict Compile (`npx tsc --noEmit`):** `0 errors`
 - **Production Bundle Build (`npm run build`):** `dist/ generated cleanly with 0 errors`
+- **High-Throughput Concurrency:** `10,000 orders distributed across 25 multi-tenant vendors calculated in < 2ms`
 
 ---
 
@@ -654,8 +718,9 @@ All development was performed on dedicated feature branches, verified with autom
 | `phase-6-payment-and-wallet` | PR #6 | Team | Phase 6: Razorpay gateway, Webhooks, Wallet ledger, Vendor payouts |
 | `phase-7-notifications-analytics-and-reviews` | PR #7 | Team | Phase 7: i18n notifications, Customer reviews, Analytics dashboards |
 | `phase-8-missing-backend-delivery-and-auth-flows` | PR #9 | Karan | Phase 8: Operational flows, dual onboarding, pricing, delivery handover, referrals, support |
-| **`phase-8-enhancements-gap-fixes`** | Active | Karan | Phase 8B: 5 Missing APIs (Notification Preferences, Product Sales Report, Customer Sales Report, Rider Performance Report), V18 Migration, 149 Endpoints, 398/398 Tests |
-| **`main`** | Merged | Team | **Stable Production Base (PR #9)** |
+| `phase-8-enhancements-gap-fixes` | PR #11 | Karan | Phase 8B: Operational APIs (Notification Preferences, Sales Reports, Rider Performance, V18 Migration) |
+| `phase9-15` | PR #12 | Karan | Phases 9 to 15: 22 missing specification features, Flow A delivery boys, reassignment, wallet PIN, V19 migration, 554/554 tests |
+| **`main`** | Merged | Team | **Current Stable Production Base (All Branches Merged)** |
 
 ---
 
