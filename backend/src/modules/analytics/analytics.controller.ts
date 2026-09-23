@@ -275,4 +275,75 @@ export class AnalyticsController {
       next(error);
     }
   }
+
+  /**
+   * GET /api/v1/analytics/admin/vendors/:vendorId/overview
+   * Super Admin: Vendor 360° overview
+   */
+  public static async getVendor360Overview(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const vendorId = req.params.vendorId as string;
+      const result = await AnalyticsService.getVendor360Overview(vendorId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/analytics/admin/vendor-sales-report
+   * Super Admin: Vendor-wise sales performance report
+   */
+  public static async getAdminSalesReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const period = String(req.query.period || 'month');
+      const page = parseInt(String(req.query.page || '1'), 10);
+      const limit = parseInt(String(req.query.limit || '20'), 10);
+      const startDate = req.query.startDate ? String(req.query.startDate) : undefined;
+      const endDate = req.query.endDate ? String(req.query.endDate) : undefined;
+      const vendorId = req.query.vendorId ? String(req.query.vendorId) : undefined;
+
+      const result = await AnalyticsService.getAdminSalesReport(
+        period,
+        startDate,
+        endDate,
+        vendorId,
+        page,
+        limit
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/analytics/admin/platform-orders-report
+   * Super Admin: Platform orders report
+   */
+  public static async getAdminOrdersReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const period = String(req.query.period || 'month');
+      const page = parseInt(String(req.query.page || '1'), 10);
+      const limit = parseInt(String(req.query.limit || '20'), 10);
+      const startDate = req.query.startDate ? String(req.query.startDate) : undefined;
+      const endDate = req.query.endDate ? String(req.query.endDate) : undefined;
+      const status = req.query.status ? String(req.query.status) : undefined;
+      const vendorId = req.query.vendorId ? String(req.query.vendorId) : undefined;
+
+      const result = await AnalyticsService.getAdminOrdersReport(
+        period,
+        startDate,
+        endDate,
+        status,
+        vendorId,
+        page,
+        limit
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

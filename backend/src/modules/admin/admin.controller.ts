@@ -178,4 +178,69 @@ export class AdminController {
       next(error);
     }
   }
+
+  public static async updateCustomerStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const result = await AdminService.updateCustomerStatus(String(id), status);
+
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async listAdminVendors(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { status, search, city, page, limit } = req.query as any;
+      const result = await AdminService.listAdminVendors({ status, search, city, page, limit });
+
+      res.status(200).json({
+        success: true,
+        data: result.vendors,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: Math.ceil(result.total / result.limit),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async getPublicVendorRequestStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { mobile } = req.query as any;
+      const result = await AdminService.getPublicVendorRequestStatus(String(mobile));
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async getPublicDeliveryJobRequestStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { mobile } = req.query as any;
+      const result = await AdminService.getPublicDeliveryJobRequestStatus(String(mobile));
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

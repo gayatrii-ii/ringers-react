@@ -9,6 +9,8 @@ import {
   keyQuerySchema,
   reviewVendorRequestSchema,
   assignDeliveryRequestSchema,
+  updateCustomerStatusSchema,
+  adminVendorQuerySchema,
 } from '../modules/admin/admin.validation.js';
 import { VendorReferralController } from '../modules/vendors/vendor-referral.controller.js';
 import {
@@ -68,4 +70,23 @@ router.patch(
   VendorReferralController.adminUpdateRewardStatus
 );
 
+// ==========================================
+// 6. Customer Governance (Activate / Suspend)
+// ==========================================
+router.patch(
+  '/customers/:id/status',
+  validate(updateCustomerStatusSchema),
+  AdminController.updateCustomerStatus
+);
+
+// ==========================================
+// 7. Full Platform Vendor Directory
+// ==========================================
+router.get(
+  '/vendors',
+  validate(adminVendorQuerySchema),
+  AdminController.listAdminVendors
+);
+
 export default router;
+

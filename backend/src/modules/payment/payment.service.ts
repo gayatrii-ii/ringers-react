@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { query, withTransaction } from '../../config/database.js';
 import { AppError } from '../../middlewares/error.middleware.js';
 import { createRazorpayOrder, createRazorpayRefund } from '../../config/razorpay.js';
@@ -689,7 +690,8 @@ export class WalletService {
   // ------------------------------------------------------------------
   public static async payOrderWithWallet(
     customerId: string,
-    orderId: string
+    orderId: string,
+    pin?: string
   ): Promise<{ transaction: PaymentTransactionResponse; wallet: WalletResponse }> {
     // 1. Validate order
     const orderRes = await query(
@@ -709,7 +711,7 @@ export class WalletService {
       throw new AppError('You are not authorized to pay for this order', 403, 'FORBIDDEN');
     }
 
-    if (order.payment_status === 'SUCCESS') {
+    if (order.payment_status === 'PAID' || order.payment_status === 'SUCCESS') {
       throw new AppError('This order has already been paid', 400, 'ALREADY_PAID');
     }
 
@@ -718,7 +720,7 @@ export class WalletService {
     return await withTransaction(async (client) => {
       // 2. Lock wallet row for update
       const walletRes = await client.query(
-        `SELECT id, balance FROM payment.wallets
+        `SELECT id, balance, wallet_pin_hash FROM payment.wallets
          WHERE user_id = $1 AND is_active = TRUE
          FOR UPDATE`,
         [customerId]
@@ -729,6 +731,18 @@ export class WalletService {
       }
 
       const wallet = walletRes.rows[0];
+
+      // Verify 4-digit PIN if one is configured
+      if (wallet.wallet_pin_hash) {
+        if (!pin) {
+          throw new AppError('Wallet PIN is required for this transaction.', 400, 'WALLET_PIN_REQUIRED');
+        }
+        const isPinValid = await bcrypt.compare(pin, wallet.wallet_pin_hash);
+        if (!isPinValid) {
+          throw new AppError('Invalid wallet PIN.', 401, 'INVALID_WALLET_PIN');
+        }
+      }
+
       const currentBalance = parseFloat(wallet.balance);
 
       if (currentBalance < totalAmount) {
@@ -767,10 +781,10 @@ export class WalletService {
         [orderId, customerId, `WALLET-${orderId.slice(0, 8)}-${Date.now()}`, totalAmount]
       );
 
-      // 6. Update order payment_status to PAID
+      // 6. Update order payment_status to PAID and payment_method to WALLET
       await client.query(
         `UPDATE order_management.orders
-         SET payment_status = 'PAID', updated_at = CURRENT_TIMESTAMP
+         SET payment_status = 'PAID', payment_method = 'WALLET', updated_at = CURRENT_TIMESTAMP
          WHERE id = $1`,
         [orderId]
       );
@@ -933,4 +947,211 @@ export class WalletService {
       balance: wallet.balance,
     };
   }
+
+  // ------------------------------------------------------------------
+  // WALLET PIN MANAGEMENT
+  // ------------------------------------------------------------------
+  public static async setWalletPin(userId: string, pin: string): Promise<{ message: string }> {
+    const wallet = await WalletService.getOrCreateWallet(userId);
+    const pinHash = await bcrypt.hash(pin, 10);
+
+    await query(
+      `UPDATE payment.wallets SET wallet_pin_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [pinHash, wallet.id]
+    );
+
+    return { message: 'Wallet PIN set successfully.' };
+  }
+
+  public static async changeWalletPin(
+    userId: string,
+    oldPin: string,
+    newPin: string
+  ): Promise<{ message: string }> {
+    const walletRes = await query<{ id: string; wallet_pin_hash: string | null }>(
+      `SELECT id, wallet_pin_hash FROM payment.wallets WHERE user_id = $1 LIMIT 1`,
+      [userId]
+    );
+
+    if (walletRes.rows.length === 0 || !walletRes.rows[0]) {
+      throw new AppError('Wallet not found.', 404, 'WALLET_NOT_FOUND');
+    }
+
+    const wallet = walletRes.rows[0];
+
+    if (!wallet.wallet_pin_hash) {
+      throw new AppError('No wallet PIN has been set yet. Please use set-pin first.', 400, 'NO_PIN_SET');
+    }
+
+    const isMatch = await bcrypt.compare(oldPin, wallet.wallet_pin_hash);
+    if (!isMatch) {
+      throw new AppError('Incorrect old PIN.', 401, 'INVALID_OLD_PIN');
+    }
+
+    const newPinHash = await bcrypt.hash(newPin, 10);
+    await query(
+      `UPDATE payment.wallets SET wallet_pin_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [newPinHash, wallet.id]
+    );
+
+    return { message: 'Wallet PIN updated successfully.' };
+  }
+
+  // ------------------------------------------------------------------
+  // UNIFIED PAYMENT HISTORY (Cash, Wallet, Online)
+  // ------------------------------------------------------------------
+  public static async getUnifiedPaymentHistory(
+    userId: string,
+    options: { page: number; limit: number }
+  ): Promise<{
+    history: Array<{
+      id: string;
+      orderId: string | null;
+      orderNumber: string | null;
+      amount: number;
+      method: string;
+      status: string;
+      createdAt: Date;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const offset = (options.page - 1) * options.limit;
+
+    const countRes = await query<{ count: string }>(
+      `SELECT (
+        (SELECT COUNT(*) FROM payment.payment_transactions WHERE user_id = $1)
+        +
+        (SELECT COUNT(*) FROM order_management.orders WHERE customer_id = $1 AND payment_method IN ('CASH', 'CASH_ON_DELIVERY'))
+      )::text as count`,
+      [userId]
+    );
+    const total = parseInt(countRes.rows[0]?.count || '0', 10);
+
+    const res = await query(
+      `SELECT 
+         pt.id::text,
+         pt.order_id::text,
+         o.order_number,
+         pt.amount,
+         pt.payment_method AS method,
+         pt.status,
+         pt.created_at
+       FROM payment.payment_transactions pt
+       LEFT JOIN order_management.orders o ON o.id = pt.order_id
+       WHERE pt.user_id = $1
+       
+       UNION ALL
+       
+       SELECT 
+         o.id::text AS id,
+         o.id::text AS order_id,
+         o.order_number,
+         o.total_amount AS amount,
+         o.payment_method AS method,
+         o.payment_status AS status,
+         o.created_at
+       FROM order_management.orders o
+       WHERE o.customer_id = $1 AND o.payment_method IN ('CASH', 'CASH_ON_DELIVERY')
+       
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [userId, options.limit, offset]
+    );
+
+    const history = res.rows.map((r) => ({
+      id: r.id,
+      orderId: r.order_id || null,
+      orderNumber: r.order_number || null,
+      amount: parseFloat(r.amount || '0'),
+      method: r.method,
+      status: r.status,
+      createdAt: r.created_at,
+    }));
+
+    return { history, total, page: options.page, limit: options.limit };
+  }
+
+  // ------------------------------------------------------------------
+  // REFUND ELIGIBILITY INSPECTION
+  // ------------------------------------------------------------------
+  public static async checkRefundEligibility(
+    orderId: string,
+    requesterUserId: string,
+    isAdmin: boolean
+  ): Promise<{
+    eligible: boolean;
+    reason?: string;
+    orderId: string;
+    orderNumber: string;
+    orderStatus: string;
+    paymentStatus: string;
+    paymentMethod: string;
+    refundableAmount: number;
+  }> {
+    const orderRes = await query<{
+      id: string;
+      order_number: string;
+      customer_id: string;
+      status: string;
+      payment_status: string;
+      payment_method: string;
+      total_amount: string;
+    }>(
+      `SELECT id, order_number, customer_id, status, payment_status, payment_method, total_amount
+       FROM order_management.orders
+       WHERE id = $1`,
+      [orderId]
+    );
+
+    if (orderRes.rows.length === 0 || !orderRes.rows[0]) {
+      throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    const order = orderRes.rows[0];
+
+    if (!isAdmin && order.customer_id !== requesterUserId) {
+      throw new AppError('You do not have permission to check refund eligibility for this order.', 403, 'FORBIDDEN');
+    }
+
+    const totalAmount = parseFloat(order.total_amount || '0');
+
+    if (order.payment_status === 'REFUNDED') {
+      return {
+        eligible: false,
+        reason: 'Order has already been refunded.',
+        orderId: order.id,
+        orderNumber: order.order_number,
+        orderStatus: order.status,
+        paymentStatus: order.payment_status,
+        paymentMethod: order.payment_method,
+        refundableAmount: 0,
+      };
+    }
+
+    if (order.payment_status !== 'PAID' && order.payment_status !== 'SUCCESS') {
+      return {
+        eligible: false,
+        reason: 'Order is not paid, no refund applicable.',
+        orderId: order.id,
+        orderNumber: order.order_number,
+        orderStatus: order.status,
+        paymentStatus: order.payment_status,
+        paymentMethod: order.payment_method,
+        refundableAmount: 0,
+      };
+    }
+
+    return {
+      eligible: true,
+      orderId: order.id,
+      orderNumber: order.order_number,
+      orderStatus: order.status,
+      paymentStatus: order.payment_status,
+      paymentMethod: order.payment_method,
+      refundableAmount: totalAmount,
+    };
+  }
 }
+

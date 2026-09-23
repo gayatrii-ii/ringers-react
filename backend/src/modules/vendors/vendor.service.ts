@@ -529,5 +529,68 @@ export class VendorService {
       upiPayUrl: updated.upi_pay_url,
     };
   }
+
+  /**
+   * Vendor: Update preferred UI language
+   */
+  public static async updateLanguage(
+    vendorId: string,
+    language: 'EN' | 'HI' | 'MR'
+  ): Promise<{ preferredLanguage: 'EN' | 'HI' | 'MR'; message: string }> {
+    await query(
+      `UPDATE vendor.vendors SET preferred_language = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [language, vendorId]
+    );
+
+    return {
+      preferredLanguage: language,
+      message: `Vendor language preference set to ${language} successfully.`,
+    };
+  }
+
+  /**
+   * Vendor: Soft-delete/deactivate store and account
+   */
+  public static async deactivateVendorAccount(vendorUserId: string): Promise<{ message: string }> {
+    const vendor = await VendorService.getVendorByOwnerUserId(vendorUserId);
+
+    // 1. Check if active in-progress orders exist
+    const activeOrders = await query<{ count: string }>(
+      `SELECT COUNT(*) AS count FROM order_management.orders
+       WHERE vendor_id = $1 AND status NOT IN ('DELIVERED', 'CANCELLED')`,
+      [vendor.id]
+    );
+
+    if (parseInt(activeOrders.rows[0]?.count || '0', 10) > 0) {
+      throw new AppError(
+        'Cannot deactivate vendor account while there are active orders in progress.',
+        400,
+        'ACTIVE_ORDERS_IN_PROGRESS'
+      );
+    }
+
+    await withTransaction(async (client) => {
+      // Soft-delete vendor
+      await client.query(
+        `UPDATE vendor.vendors SET status = 'INACTIVE', deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [vendor.id]
+      );
+
+      // Deactivate user
+      await client.query(
+        `UPDATE identity.users SET status = 'DEACTIVATED', deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [vendorUserId]
+      );
+
+      // Revoke tokens
+      await client.query(
+        `UPDATE identity.refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = $1`,
+        [vendorUserId]
+      );
+    });
+
+    return { message: 'Vendor store and account have been successfully deactivated.' };
+  }
 }
+
 

@@ -344,4 +344,145 @@ export class VendorDeliveryOnboardingService {
       message: `Delivery rider status updated to ${status} successfully.`,
     };
   }
+
+  /**
+   * Flow A: Directly create and provision Delivery Boy account for Vendor
+   */
+  public static async createDirectDeliveryBoy(
+    vendorUserId: string,
+    data: {
+      firstName: string;
+      lastName: string;
+      mobile: string;
+      email?: string;
+      password: string;
+      vehicleType?: 'BIKE' | 'SCOOTER' | 'CYCLE' | 'ELECTRIC_VEHICLE';
+      licenseNumber?: string;
+      profilePhotoUrl?: string;
+    }
+  ): Promise<{
+    deliveryBoyId: string;
+    fullName: string;
+    mobile: string;
+    email: string | null;
+    status: string;
+    message: string;
+  }> {
+    const vendorId = await this.getVendorByOwnerId(vendorUserId);
+
+    return await withTransaction(async (client) => {
+      // 1. Check if mobile already exists in users
+      const existingUser = await client.query(
+        `SELECT id FROM identity.users WHERE phone = $1 LIMIT 1`,
+        [data.mobile]
+      );
+      if (existingUser.rows.length > 0) {
+        throw new AppError('A user with this mobile number already exists.', 409, 'PHONE_ALREADY_EXISTS');
+      }
+
+      // 2. Hash password
+      const passwordHash = await bcrypt.hash(data.password, 12);
+
+      // 3. Insert user with DELIVERY_BOY role
+      const userRes = await client.query<{ id: string }>(
+        `INSERT INTO identity.users (first_name, last_name, phone, email, password_hash, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         RETURNING id`,
+        [data.firstName, data.lastName, data.mobile, data.email || null, passwordHash]
+      );
+      if (!userRes.rows[0]) {
+        throw new AppError('Failed to create delivery boy user', 500, 'USER_CREATION_FAILED');
+      }
+      const deliveryBoyUserId = userRes.rows[0].id;
+
+      // 4. Assign DELIVERY_BOY role
+      const roleRes = await client.query<{ id: string }>(
+        `SELECT id FROM identity.roles WHERE name = $1 LIMIT 1`,
+        [ROLES.DELIVERY_BOY]
+      );
+      if (roleRes.rows[0]) {
+        await client.query(
+          `INSERT INTO identity.user_roles (user_id, role_id)
+           VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [deliveryBoyUserId, roleRes.rows[0].id]
+        );
+      }
+
+      // 5. Create delivery profile
+      await client.query(
+        `INSERT INTO delivery.delivery_profiles (user_id, vehicle_type, license_number, status, created_at, updated_at)
+         VALUES ($1, $2, $3, 'OFFLINE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id) DO UPDATE 
+         SET vehicle_type = EXCLUDED.vehicle_type, license_number = EXCLUDED.license_number, updated_at = CURRENT_TIMESTAMP`,
+        [deliveryBoyUserId, data.vehicleType || 'BIKE', data.licenseNumber || null]
+      );
+
+      // 6. Record in delivery_boy_job_requests to associate with vendor
+      await client.query(
+        `INSERT INTO delivery.delivery_boy_job_requests 
+         (full_name, mobile, email, address, city, vehicle_type, driving_license_number, status, assigned_vendor_id, activated_user_id, notes, created_at, updated_at)
+         VALUES ($1, $2, $3, 'Created directly by vendor', 'Local', $4, $5, 'ACTIVATED', $6, $7, 'Vendor Direct Onboarding', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        [
+          `${data.firstName} ${data.lastName}`.trim(),
+          data.mobile,
+          data.email || null,
+          data.vehicleType || 'BIKE',
+          data.licenseNumber || null,
+          vendorId,
+          deliveryBoyUserId,
+        ]
+      );
+
+      return {
+        deliveryBoyId: deliveryBoyUserId,
+        fullName: `${data.firstName} ${data.lastName}`.trim(),
+        mobile: data.mobile,
+        email: data.email || null,
+        status: 'ACTIVE',
+        message: 'Delivery Boy account created and associated with your store successfully.',
+      };
+    });
+  }
+
+  /**
+   * Vendor: Reset password for a delivery partner in their fleet
+   */
+  public static async resetRiderPassword(
+    vendorUserId: string,
+    riderId: string,
+    newPasswordPlain: string
+  ): Promise<{ message: string }> {
+    const vendorId = await this.getVendorByOwnerId(vendorUserId);
+
+    // Verify this rider belongs to this vendor
+    const checkRes = await query<{ id: string }>(
+      `SELECT id FROM delivery.delivery_boy_job_requests 
+       WHERE assigned_vendor_id = $1 AND activated_user_id = $2`,
+      [vendorId, riderId]
+    );
+
+    if (checkRes.rows.length === 0) {
+      throw new AppError('Delivery rider not found or not registered under your store.', 404, 'RIDER_NOT_FOUND');
+    }
+
+    const passwordHash = await bcrypt.hash(newPasswordPlain, 12);
+
+    await withTransaction(async (client) => {
+      // 1. Update password
+      await client.query(
+        `UPDATE identity.users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [passwordHash, riderId]
+      );
+
+      // 2. Revoke any existing active refresh tokens
+      await client.query(
+        `UPDATE identity.refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND revoked_at IS NULL`,
+        [riderId]
+      );
+    });
+
+    return { message: 'Delivery partner password has been reset successfully.' };
+  }
 }
+

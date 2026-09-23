@@ -12,6 +12,7 @@ import {
   addVendorStaffSchema,
   vendorQuerySchema,
   updateVendorPaymentSettingsSchema,
+  updateVendorLanguageSchema,
 } from '../modules/vendors/vendor.validation.js';
 import { CustomerOnboardingController } from '../modules/customer/customer-onboarding.controller.js';
 import {
@@ -33,6 +34,8 @@ import {
   activateDeliveryBoySchema,
   listVendorDeliveryBoysSchema,
   updateVendorRiderStatusSchema,
+  createDirectDeliveryBoySchema,
+  vendorResetRiderPasswordSchema,
 } from '../modules/vendors/vendor-delivery-onboarding.validation.js';
 import { VendorReferralController } from '../modules/vendors/vendor-referral.controller.js';
 import {
@@ -59,6 +62,21 @@ router.put(
   requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
   validate(updateVendorProfileSchema),
   VendorController.updateMyVendorProfile
+);
+
+router.patch(
+  '/profile/me/language',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(updateVendorLanguageSchema),
+  VendorController.updateLanguage
+);
+
+router.delete(
+  '/profile/me',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  VendorController.deactivateAccount
 );
 
 router.post(
@@ -201,6 +219,25 @@ router.patch(
   validate(updateVendorRiderStatusSchema),
   VendorDeliveryOnboardingController.updateVendorRiderStatus
 );
+
+// Flow A: Direct Delivery Boy Account Creation
+router.post(
+  '/delivery-boys',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(createDirectDeliveryBoySchema),
+  VendorDeliveryOnboardingController.createDirectDeliveryBoy
+);
+
+// Vendor resets password for delivery boy
+router.patch(
+  '/delivery-boys/:riderId/reset-password',
+  authenticateToken,
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(vendorResetRiderPasswordSchema),
+  VendorDeliveryOnboardingController.resetRiderPassword
+);
+
 
 // ==========================================
 // 1d. Vendor Referral Program

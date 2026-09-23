@@ -29,6 +29,9 @@ export const createOrderSchema = z.object({
         })
       )
       .min(1, 'At least one item is required to place an order'),
+    paymentMethod: z
+      .enum(['CASH_ON_DELIVERY', 'CASH', 'WALLET', 'ONLINE'])
+      .default('CASH_ON_DELIVERY'),
     customerNotes: z.string().trim().max(500, 'Notes cannot exceed 500 characters').optional().nullable(),
   }),
 });

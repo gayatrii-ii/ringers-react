@@ -46,3 +46,41 @@ export const leaderboardQuerySchema = z.object({
     period: z.enum(['today', 'week', 'month', 'year']).default('month'),
   }),
 });
+
+export const vendorOverviewParamsSchema = z.object({
+  params: z.object({
+    vendorId: z.string().uuid('Invalid vendor ID'),
+  }),
+});
+
+export const adminSalesReportQuerySchema = z.object({
+  query: dateRangeQuery.extend({
+    period: z.enum(['today', 'week', 'month', 'year', 'custom']).default('month'),
+    vendorId: z.string().uuid().optional(),
+    page: z
+      .string()
+      .transform((v) => Math.max(1, parseInt(v, 10) || 1))
+      .default('1'),
+    limit: z
+      .string()
+      .transform((v) => Math.min(100, Math.max(1, parseInt(v, 10) || 20)))
+      .default('20'),
+  }),
+});
+
+export const adminOrdersReportQuerySchema = z.object({
+  query: dateRangeQuery.extend({
+    period: z.enum(['today', 'week', 'month', 'year', 'custom']).default('month'),
+    status: z.string().optional(),
+    vendorId: z.string().uuid().optional(),
+    page: z
+      .string()
+      .transform((v) => Math.max(1, parseInt(v, 10) || 1))
+      .default('1'),
+    limit: z
+      .string()
+      .transform((v) => Math.min(100, Math.max(1, parseInt(v, 10) || 20)))
+      .default('20'),
+  }),
+});
+

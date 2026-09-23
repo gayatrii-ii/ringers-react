@@ -357,9 +357,12 @@ export class OrderService {
       vendorId: string;
       addressId: string;
       items: OrderItemInput[];
+      paymentMethod?: 'CASH_ON_DELIVERY' | 'CASH' | 'WALLET' | 'ONLINE';
       customerNotes?: string | null;
     }
   ): Promise<OrderResponse> {
+    const paymentMethod = data.paymentMethod || 'CASH_ON_DELIVERY';
+
     // 1. Run price calculation engine first
     const calculation = await OrderService.calculateOrder(customerId, data.vendorId, data.addressId, data.items);
 
@@ -401,6 +404,7 @@ export class OrderService {
            customer_id,
            vendor_id,
            status,
+           payment_method,
            payment_status,
            delivery_status,
            subtotal,
@@ -409,12 +413,13 @@ export class OrderService {
            delivery_fee,
            total_amount,
            shipping_address_snapshot
-         ) VALUES ($1, $2, $3, 'PENDING', 'PENDING', 'UNASSIGNED', $4, $5, $6, $7, $8, $9)
+         ) VALUES ($1, $2, $3, 'PENDING', $4, 'PENDING', 'UNASSIGNED', $5, $6, $7, $8, $9, $10)
          RETURNING *`,
         [
           orderNumber,
           customerId,
           data.vendorId,
+          paymentMethod,
           calculation.subtotal,
           calculation.discountAmount,
           calculation.taxAmount,
@@ -648,6 +653,24 @@ export class OrderService {
     userRoles: RoleCode[],
     reason: string
   ): Promise<OrderResponse> {
+    const orderCheck = await query<{ status: string }>(
+      `SELECT status FROM order_management.orders WHERE id = $1`,
+      [orderId]
+    );
+
+    if (orderCheck.rows.length === 0 || !orderCheck.rows[0]) {
+      throw new AppError('Order not found', 404, 'ORDER_NOT_FOUND');
+    }
+
+    const currentStatus = orderCheck.rows[0].status;
+    if (['OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'].includes(currentStatus)) {
+      throw new AppError(
+        `Order cannot be cancelled because it is already ${currentStatus}.`,
+        400,
+        'ORDER_CANNOT_BE_CANCELLED'
+      );
+    }
+
     return await OrderService.updateOrderStatus(orderId, 'CANCELLED', userId, userRoles, reason);
   }
 

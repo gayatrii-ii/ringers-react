@@ -8,6 +8,7 @@ import {
   createTicketSchema,
   resolveTicketSchema,
   listTicketsQuerySchema,
+  vendorRespondTicketSchema,
 } from '../modules/support/support.validation.js';
 
 const router = Router();
@@ -19,6 +20,21 @@ router.use(authenticateToken);
 router.post('/tickets', validate(createTicketSchema), SupportController.createTicket);
 router.get('/tickets/my', validate(listTicketsQuerySchema), SupportController.listMyTickets);
 router.get('/tickets/:id', SupportController.getTicketById);
+
+// Vendor store ticket desk
+router.get(
+  '/vendor/tickets',
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(listTicketsQuerySchema),
+  SupportController.listVendorTickets
+);
+
+router.patch(
+  '/vendor/tickets/:id/respond',
+  requireRoles(ROLES.VENDOR, ROLES.SUPER_ADMIN),
+  validate(vendorRespondTicketSchema),
+  SupportController.vendorRespondToTicket
+);
 
 // Admin ticket management
 router.get(
@@ -36,3 +52,4 @@ router.patch(
 );
 
 export default router;
+
