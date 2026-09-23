@@ -9,6 +9,9 @@ import {
   vendorAnalyticsQuerySchema,
   vendorReportPaginationQuerySchema,
   leaderboardQuerySchema,
+  vendorOverviewParamsSchema,
+  adminSalesReportQuerySchema,
+  adminOrdersReportQuerySchema,
 } from '../modules/analytics/analytics.validation.js';
 
 const router = Router();
@@ -39,6 +42,31 @@ router.get(
   validate(adminAnalyticsQuerySchema),
   AnalyticsController.getDeliveryPerformance
 );
+
+// 3a. Super Admin: Vendor 360° Overview
+router.get(
+  '/admin/vendors/:vendorId/overview',
+  requireRoles(ROLES.SUPER_ADMIN),
+  validate(vendorOverviewParamsSchema),
+  AnalyticsController.getVendor360Overview
+);
+
+// 3b. Super Admin: Vendor Sales Report
+router.get(
+  '/admin/vendor-sales-report',
+  requireRoles(ROLES.SUPER_ADMIN),
+  validate(adminSalesReportQuerySchema),
+  AnalyticsController.getAdminSalesReport
+);
+
+// 3c. Super Admin: Platform Orders Report
+router.get(
+  '/admin/platform-orders-report',
+  requireRoles(ROLES.SUPER_ADMIN),
+  validate(adminOrdersReportQuerySchema),
+  AnalyticsController.getAdminOrdersReport
+);
+
 
 // 4. Vendor: Store Performance & Revenue
 router.get(

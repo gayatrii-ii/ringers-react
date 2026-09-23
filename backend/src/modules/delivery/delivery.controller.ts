@@ -43,6 +43,46 @@ export class DeliveryController {
   }
 
   /**
+   * PATCH /api/v1/delivery/profile/language
+   */
+  public static async updateLanguage(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+      }
+
+      const { preferredLanguage } = req.body;
+      const result = await DeliveryService.updateLanguage(req.user.userId, preferredLanguage);
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/v1/delivery/profile/me
+   */
+  public static async deactivateAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+      }
+
+      const result = await DeliveryService.deactivateRiderAccount(req.user.userId);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+
+  /**
    * PATCH /api/v1/delivery/duty-status
    */
   public static async updateDutyStatus(req: Request, res: Response, next: NextFunction): Promise<void> {

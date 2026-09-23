@@ -36,6 +36,38 @@ export class DeliveryAssignmentController {
   }
 
   /**
+   * Vendor: Reassign Delivery Rider to Order
+   */
+  public static async reassignRider(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const orderId = getParamId(req);
+      const { riderId, reason } = req.body;
+      const user = (req as any).user;
+
+      const result = await DeliveryAssignmentService.reassignRiderToOrder(
+        orderId,
+        user.userId,
+        user.roles,
+        riderId,
+        reason
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'Delivery partner reassigned successfully.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+
+  /**
    * Rider: Accept Assignment
    */
   public static async acceptAssignment(

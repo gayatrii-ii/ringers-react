@@ -111,4 +111,55 @@ export class VendorDeliveryOnboardingController {
       next(error);
     }
   }
+
+  /**
+   * Flow A: Vendor creates a Delivery Boy account directly
+   */
+  public static async createDirectDeliveryBoy(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const vendorUserId = (req as any).user.userId;
+      const result = await VendorDeliveryOnboardingService.createDirectDeliveryBoy(
+        vendorUserId,
+        req.body
+      );
+      res.status(201).json({
+        success: true,
+        message: result.message,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Vendor: Reset password for rider in vendor's fleet
+   */
+  public static async resetRiderPassword(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const vendorUserId = (req as any).user.userId;
+      const { riderId } = req.params;
+      const { password } = req.body;
+      const result = await VendorDeliveryOnboardingService.resetRiderPassword(
+        vendorUserId,
+        String(riderId),
+        password
+      );
+      res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

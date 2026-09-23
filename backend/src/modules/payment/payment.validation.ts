@@ -88,10 +88,55 @@ export const walletTransactionQuerySchema = z.object({
 
 /**
  * POST /api/v1/wallet/pay
- * Customer pays for an order using their wallet balance
+ * Customer pays for an order using their wallet balance (requires 4-digit PIN if configured)
  */
 export const walletPaySchema = z.object({
   body: z.object({
+    orderId: z.string().uuid('Valid order UUID is required'),
+    pin: z.string().regex(/^\d{4}$/, 'Wallet PIN must be a 4-digit numeric code').optional(),
+  }),
+});
+
+/**
+ * POST /api/v1/wallet/pin (Set initial wallet PIN)
+ */
+export const setWalletPinSchema = z.object({
+  body: z.object({
+    pin: z.string().regex(/^\d{4}$/, 'PIN must be a 4-digit numeric code'),
+  }),
+});
+
+/**
+ * PATCH /api/v1/wallet/pin (Change wallet PIN)
+ */
+export const changeWalletPinSchema = z.object({
+  body: z.object({
+    oldPin: z.string().regex(/^\d{4}$/, 'Old PIN must be a 4-digit numeric code'),
+    newPin: z.string().regex(/^\d{4}$/, 'New PIN must be a 4-digit numeric code'),
+  }),
+});
+
+/**
+ * GET /api/v1/payments/my-history (Unified payment history)
+ */
+export const unifiedPaymentHistoryQuerySchema = z.object({
+  query: z.object({
+    page: z
+      .string()
+      .transform((v) => Math.max(1, parseInt(v, 10) || 1))
+      .default('1'),
+    limit: z
+      .string()
+      .transform((v) => Math.min(100, Math.max(1, parseInt(v, 10) || 20)))
+      .default('20'),
+  }),
+});
+
+/**
+ * GET /api/v1/payments/refund-eligibility/:orderId
+ */
+export const refundEligibilityParamSchema = z.object({
+  params: z.object({
     orderId: z.string().uuid('Valid order UUID is required'),
   }),
 });
@@ -105,3 +150,4 @@ export const adminRefundSchema = z.object({
     reason: z.string().trim().min(3, 'Reason is required').max(500, 'Reason cannot exceed 500 characters'),
   }),
 });
+

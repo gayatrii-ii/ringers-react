@@ -16,7 +16,9 @@
     "test:payment": "tsx scripts/test-payment-flow.ts",
     "test:phase7": "tsx scripts/test-phase7-flow.ts",
     "test:phase8": "tsx scripts/test-phase8-flow.ts",
-    "test:all": "npm run test:auth && npm run test:catalog && npm run test:admin && npm run test:customer-delivery && npm run test:order && npm run test:payment && npm run test:phase7 && npm run test:phase8",
+    "test:enhancements": "tsx scripts/test-enhancements-flow.ts",
+    "test:production": "tsx scripts/test-production-scale-flow.ts",
+    "test:all": "npm run test:auth && npm run test:catalog && npm run test:admin && npm run test:customer-delivery && npm run test:order && npm run test:payment && npm run test:phase7 && npm run test:phase8 && npm run test:enhancements && npm run test:production",
     "admin:setup": "tsx scripts/setup-super-admin.ts"
   },
   "keywords": [

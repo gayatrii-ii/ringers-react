@@ -78,3 +78,10 @@ export const updateVendorPaymentSettingsSchema = z.object({
 });
 
 export type UpdateVendorPaymentSettingsInput = z.infer<typeof updateVendorPaymentSettingsSchema>['body'];
+
+export const updateVendorLanguageSchema = z.object({
+  body: z.object({
+    preferredLanguage: z.enum(['EN', 'HI', 'MR']),
+  }),
+});
+

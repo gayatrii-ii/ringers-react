@@ -114,4 +114,53 @@ export class SupportController {
       next(error);
     }
   }
+
+  /**
+   * Vendor: List tickets related to vendor store
+   */
+  public static async listVendorTickets(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const result = await SupportService.listVendorTickets(user.userId, req.query as any);
+      res.status(200).json({
+        success: true,
+        data: result.tickets,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: Math.ceil(result.total / result.limit),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Vendor: Respond to support ticket
+   */
+  public static async vendorRespondToTicket(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0]! : req.params.id!;
+      const user = (req as any).user;
+      const { response } = req.body;
+      const result = await SupportService.vendorRespondToTicket(user.userId, id, response);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

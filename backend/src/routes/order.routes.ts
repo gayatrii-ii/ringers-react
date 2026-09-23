@@ -13,7 +13,10 @@ import {
   orderQuerySchema,
 } from '../modules/orders/order.validation.js';
 import { DeliveryAssignmentController } from '../modules/delivery/delivery.assignment.controller.js';
-import { assignDeliverySchema } from '../modules/delivery/delivery.assignment.validation.js';
+import {
+  assignDeliverySchema,
+  reassignDeliverySchema,
+} from '../modules/delivery/delivery.assignment.validation.js';
 
 const router = Router();
 
@@ -95,6 +98,14 @@ router.post(
   requireRoles(ROLES.VENDOR),
   validate(assignDeliverySchema),
   DeliveryAssignmentController.assignRider
+);
+
+// Vendor-Only delivery re-assignment
+router.post(
+  '/:id/reassign-delivery',
+  requireRoles(ROLES.VENDOR),
+  validate(reassignDeliverySchema),
+  DeliveryAssignmentController.reassignRider
 );
 
 // Customer Direct Delivery Confirmation (Path B)

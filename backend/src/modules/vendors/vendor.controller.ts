@@ -254,5 +254,38 @@ export class VendorController {
       next(error);
     }
   }
+
+  /**
+   * PATCH /api/v1/vendors/profile/me/language
+   */
+  public static async updateLanguage(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const vendorId = await VendorController.resolveVendorIdForUser(req);
+      const { preferredLanguage } = req.body;
+      const result = await VendorService.updateLanguage(vendorId, preferredLanguage);
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/v1/vendors/profile/me
+   */
+  public static async deactivateAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) throw new AppError('Unauthorized', 401, 'UNAUTHORIZED');
+      const result = await VendorService.deactivateVendorAccount(req.user.userId);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 

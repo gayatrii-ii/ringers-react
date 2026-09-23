@@ -8,6 +8,7 @@ import {
   updateDeliveryProfileSchema,
   updateDutyStatusSchema,
   adminUpdateRiderStatusSchema,
+  updateDeliveryLanguageSchema,
 } from '../modules/delivery/delivery.validation.js';
 import { DeliveryAssignmentController } from '../modules/delivery/delivery.assignment.controller.js';
 import {
@@ -39,6 +40,19 @@ router.put(
   requireRoles(ROLES.DELIVERY_BOY, ROLES.SUPER_ADMIN),
   validate(updateDeliveryProfileSchema),
   DeliveryController.updateProfile
+);
+
+router.patch(
+  '/profile/language',
+  requireRoles(ROLES.DELIVERY_BOY, ROLES.SUPER_ADMIN),
+  validate(updateDeliveryLanguageSchema),
+  DeliveryController.updateLanguage
+);
+
+router.delete(
+  '/profile/me',
+  requireRoles(ROLES.DELIVERY_BOY, ROLES.SUPER_ADMIN),
+  DeliveryController.deactivateAccount
 );
 
 router.patch(

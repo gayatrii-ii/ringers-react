@@ -415,4 +415,65 @@ export class DeliveryService {
       message: `Rider account status updated to ${status}`,
     };
   }
+
+  /**
+   * Rider: Update preferred UI language
+   */
+  public static async updateLanguage(
+    riderUserId: string,
+    language: 'EN' | 'HI' | 'MR'
+  ): Promise<{ preferredLanguage: 'EN' | 'HI' | 'MR'; message: string }> {
+    await query(
+      `UPDATE delivery.delivery_profiles SET preferred_language = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
+      [language, riderUserId]
+    );
+
+    return {
+      preferredLanguage: language,
+      message: `Delivery partner language preference set to ${language} successfully.`,
+    };
+  }
+
+  /**
+   * Rider: Soft-delete/deactivate account
+   */
+  public static async deactivateRiderAccount(riderUserId: string): Promise<{ message: string }> {
+    // 1. Check if active deliveries in progress
+    const activeAssignments = await query<{ count: string }>(
+      `SELECT COUNT(*) AS count FROM delivery.delivery_assignments
+       WHERE delivery_boy_id = $1 AND status IN ('ASSIGNED', 'ACCEPTED', 'PICKED_UP')`,
+      [riderUserId]
+    );
+
+    if (parseInt(activeAssignments.rows[0]?.count || '0', 10) > 0) {
+      throw new AppError(
+        'Cannot deactivate rider account while you have active deliveries in progress.',
+        400,
+        'ACTIVE_DELIVERIES_IN_PROGRESS'
+      );
+    }
+
+    await withTransaction(async (client) => {
+      // Mark profile OFFLINE
+      await client.query(
+        `UPDATE delivery.delivery_profiles SET status = 'OFFLINE', updated_at = CURRENT_TIMESTAMP WHERE user_id = $1`,
+        [riderUserId]
+      );
+
+      // Deactivate user
+      await client.query(
+        `UPDATE identity.users SET status = 'DEACTIVATED', deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [riderUserId]
+      );
+
+      // Revoke tokens
+      await client.query(
+        `UPDATE identity.refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = $1`,
+        [riderUserId]
+      );
+    });
+
+    return { message: 'Delivery partner account has been successfully deactivated.' };
+  }
 }
+

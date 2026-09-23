@@ -1,4 +1,5 @@
 import { query } from '../../config/database.js';
+import { AppError } from '../../middlewares/error.middleware.js';
 
 // ─────────────────────────────────────────────────────────────
 // Date range helpers
@@ -265,12 +266,12 @@ export class AnalyticsService {
       `SELECT
          dp.user_id AS rider_id,
          CONCAT(u.first_name, ' ', u.last_name) AS rider_name,
-         COUNT(o.id) AS total_deliveries,
-         COUNT(o.id) FILTER (WHERE o.status = 'DELIVERED') AS completed_deliveries
-       FROM delivery.delivery_partners dp
+         COUNT(da.id) AS total_deliveries,
+         COUNT(da.id) FILTER (WHERE da.status = 'DELIVERED') AS completed_deliveries
+       FROM delivery.delivery_profiles dp
        JOIN identity.users u ON u.id = dp.user_id
-       LEFT JOIN order_management.orders o 
-         ON o.delivery_partner_id = dp.user_id AND ${riderDateFilter.sql}
+       LEFT JOIN delivery.delivery_assignments da 
+         ON da.delivery_boy_id = dp.user_id AND ${riderDateFilter.sql.replace(/o\.created_at/g, 'da.created_at')}
        GROUP BY dp.user_id, u.first_name, u.last_name
        ORDER BY completed_deliveries DESC
        LIMIT 10`,
@@ -668,13 +669,14 @@ export class AnalyticsService {
     page: number;
     limit: number;
   }> {
-    const riderDateFilter = buildDateFilter(period, startDate, endDate, 'o.created_at', 2);
+    const riderDateFilter = buildDateFilter(period, startDate, endDate, 'da.created_at', 2);
     const offset = (page - 1) * limit;
 
     const countRes = await query<{ count: string }>(
-      `SELECT COUNT(DISTINCT o.delivery_partner_id) AS count
-       FROM order_management.orders o
-       WHERE o.vendor_id = $1 AND o.delivery_partner_id IS NOT NULL AND ${riderDateFilter.sql}`,
+      `SELECT COUNT(DISTINCT da.delivery_boy_id) AS count
+       FROM delivery.delivery_assignments da
+       JOIN order_management.orders o ON o.id = da.order_id
+       WHERE o.vendor_id = $1 AND ${riderDateFilter.sql}`,
       [vendorId, ...riderDateFilter.params]
     );
 
@@ -696,18 +698,19 @@ export class AnalyticsService {
          u.first_name,
          u.last_name,
          u.phone,
-         COALESCE(dp.vehicle_type, 'MOTORCYCLE') AS vehicle_type,
-         COUNT(o.id) AS total_assigned,
-         COUNT(o.id) FILTER (WHERE o.status = 'DELIVERED') AS completed_deliveries,
-         COUNT(o.id) FILTER (WHERE o.delivery_status = 'FAILED') AS failed_deliveries,
+         COALESCE(dp.vehicle_type, 'BIKE') AS vehicle_type,
+         COUNT(da.id) AS total_assigned,
+         COUNT(da.id) FILTER (WHERE da.status = 'DELIVERED') AS completed_deliveries,
+         COUNT(da.id) FILTER (WHERE da.status = 'REJECTED' OR da.status = 'CANCELLED') AS failed_deliveries,
          ROUND(
-           AVG(EXTRACT(EPOCH FROM (o.completed_at - o.confirmed_at)) / 60)
-           FILTER (WHERE o.status = 'DELIVERED' AND o.completed_at IS NOT NULL AND o.confirmed_at IS NOT NULL),
+           AVG(EXTRACT(EPOCH FROM (da.delivered_at - da.assigned_at)) / 60)
+           FILTER (WHERE da.status = 'DELIVERED' AND da.delivered_at IS NOT NULL AND da.assigned_at IS NOT NULL),
            1
          ) AS avg_minutes
-       FROM delivery.delivery_partners dp
+       FROM delivery.delivery_profiles dp
        JOIN identity.users u ON u.id = dp.user_id
-       JOIN order_management.orders o ON o.delivery_partner_id = dp.user_id
+       JOIN delivery.delivery_assignments da ON da.delivery_boy_id = dp.user_id
+       JOIN order_management.orders o ON o.id = da.order_id
        WHERE o.vendor_id = $1 AND ${riderDateFilter.sql}
        GROUP BY dp.user_id, u.first_name, u.last_name, u.phone, dp.vehicle_type
        ORDER BY completed_deliveries DESC
@@ -737,4 +740,248 @@ export class AnalyticsService {
       limit,
     };
   }
+
+  /**
+   * 10. Super Admin: Vendor 360° Overview
+   */
+  public static async getVendor360Overview(vendorId: string): Promise<any> {
+    const vendorRes = await query(
+      `SELECT
+         v.id,
+         v.business_name,
+         v.business_type,
+         v.status,
+         v.commission_rate,
+         v.city,
+         v.created_at,
+         u.first_name AS owner_first_name,
+         u.last_name AS owner_last_name,
+         u.email AS owner_email,
+         u.phone AS owner_phone
+       FROM vendor.vendors v
+       JOIN identity.users u ON u.id = v.owner_user_id
+       WHERE v.id = $1`,
+      [vendorId]
+    );
+
+    if (vendorRes.rows.length === 0 || !vendorRes.rows[0]) {
+      throw new AppError('Vendor not found', 404, 'VENDOR_NOT_FOUND');
+    }
+
+    const vendor = vendorRes.rows[0];
+
+    // Order & GMV metrics
+    const orderRes = await query(
+      `SELECT
+         COUNT(*) AS total_orders,
+         COUNT(*) FILTER (WHERE status = 'DELIVERED') AS completed_orders,
+         COUNT(*) FILTER (WHERE status = 'CANCELLED') AS cancelled_orders,
+         COALESCE(SUM(total_amount) FILTER (WHERE status = 'DELIVERED'), 0) AS total_gmv
+       FROM order_management.orders
+       WHERE vendor_id = $1`,
+      [vendorId]
+    );
+    const orderRow = orderRes.rows[0] || {};
+
+    // Catalog stats
+    const catalogRes = await query(
+      `SELECT
+         COUNT(*) AS total_products,
+         COUNT(*) FILTER (WHERE is_active = TRUE) AS active_products
+       FROM catalog.products
+       WHERE vendor_id = $1`,
+      [vendorId]
+    );
+    const catalogRow = catalogRes.rows[0] || {};
+
+    // Wallet balance
+    const walletRes = await query(
+      `SELECT balance, is_active FROM payment.wallets WHERE vendor_id = $1 LIMIT 1`,
+      [vendorId]
+    );
+    const walletRow = walletRes.rows[0];
+
+    // Support ticket count
+    const supportRes = await query(
+      `SELECT
+         COUNT(*) AS total_tickets,
+         COUNT(*) FILTER (WHERE status = 'OPEN') AS open_tickets
+       FROM support.tickets
+       WHERE vendor_id = $1`,
+      [vendorId]
+    );
+    const supportRow = supportRes.rows[0] || {};
+
+    return {
+      vendor: {
+        id: vendor.id,
+        businessName: vendor.business_name,
+        businessType: vendor.business_type,
+        status: vendor.status,
+        commissionRate: parseFloat(vendor.commission_rate || '0'),
+        city: vendor.city,
+        createdAt: vendor.created_at,
+        owner: {
+          name: `${vendor.owner_first_name} ${vendor.owner_last_name}`.trim(),
+          email: vendor.owner_email,
+          phone: vendor.owner_phone,
+        },
+      },
+      performance: {
+        totalOrders: parseInt(orderRow.total_orders || '0', 10),
+        completedOrders: parseInt(orderRow.completed_orders || '0', 10),
+        cancelledOrders: parseInt(orderRow.cancelled_orders || '0', 10),
+        totalGmv: parseFloat(orderRow.total_gmv || '0'),
+      },
+      catalog: {
+        totalProducts: parseInt(catalogRow.total_products || '0', 10),
+        activeProducts: parseInt(catalogRow.active_products || '0', 10),
+      },
+      wallet: {
+        balance: walletRow ? parseFloat(walletRow.balance || '0') : 0,
+        isActive: walletRow ? walletRow.is_active : false,
+      },
+      support: {
+        totalTickets: parseInt(supportRow.total_tickets || '0', 10),
+        openTickets: parseInt(supportRow.open_tickets || '0', 10),
+      },
+    };
+  }
+
+  /**
+   * 11. Super Admin: Vendor Sales Report
+   */
+  public static async getAdminSalesReport(
+    period: string,
+    startDate?: string,
+    endDate?: string,
+    vendorId?: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<any> {
+    const dateFilter = buildDateFilter(period, startDate, endDate, 'o.created_at', vendorId ? 2 : 1);
+    const params: any[] = vendorId ? [vendorId, ...dateFilter.params] : [...dateFilter.params];
+    const vendorClause = vendorId ? 'AND o.vendor_id = $1' : '';
+    const offset = (page - 1) * limit;
+
+    const countRes = await query<{ count: string }>(
+      `SELECT COUNT(DISTINCT o.vendor_id) AS count
+       FROM order_management.orders o
+       WHERE ${dateFilter.sql} ${vendorClause}`,
+      params
+    );
+    const total = parseInt(countRes.rows[0]?.count || '0', 10);
+
+    const itemsRes = await query(
+      `SELECT
+         v.id AS vendor_id,
+         v.business_name,
+         COUNT(o.id) AS total_orders,
+         COUNT(o.id) FILTER (WHERE o.status = 'DELIVERED') AS completed_orders,
+         COUNT(o.id) FILTER (WHERE o.status = 'CANCELLED') AS cancelled_orders,
+         COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'DELIVERED'), 0) AS total_sales,
+         COALESCE(SUM(o.total_amount * COALESCE(v.commission_rate, 10.0) / 100) FILTER (WHERE o.status = 'DELIVERED'), 0) AS platform_commission
+       FROM vendor.vendors v
+       JOIN order_management.orders o ON o.vendor_id = v.id
+       WHERE ${dateFilter.sql} ${vendorClause}
+       GROUP BY v.id, v.business_name
+       ORDER BY total_sales DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset]
+    );
+
+    return {
+      items: itemsRes.rows.map((row) => ({
+        vendorId: row.vendor_id,
+        businessName: row.business_name,
+        totalOrders: parseInt(row.total_orders || '0', 10),
+        completedOrders: parseInt(row.completed_orders || '0', 10),
+        cancelledOrders: parseInt(row.cancelled_orders || '0', 10),
+        totalSales: parseFloat(row.total_sales || '0'),
+        platformCommission: parseFloat(row.platform_commission || '0'),
+      })),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  /**
+   * 12. Super Admin: Platform Orders Report
+   */
+  public static async getAdminOrdersReport(
+    period: string,
+    startDate?: string,
+    endDate?: string,
+    status?: string,
+    vendorId?: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<any> {
+    const params: any[] = [];
+    const conditions: string[] = ['1=1'];
+
+    if (status) {
+      params.push(status);
+      conditions.push(`o.status = $${params.length}`);
+    }
+    if (vendorId) {
+      params.push(vendorId);
+      conditions.push(`o.vendor_id = $${params.length}`);
+    }
+
+    const dateFilter = buildDateFilter(period, startDate, endDate, 'o.created_at', params.length + 1);
+    conditions.push(dateFilter.sql);
+    params.push(...dateFilter.params);
+
+    const whereClause = conditions.join(' AND ');
+    const offset = (page - 1) * limit;
+
+    const countRes = await query<{ count: string }>(
+      `SELECT COUNT(*) AS count
+       FROM order_management.orders o
+       WHERE ${whereClause}`,
+      params
+    );
+    const total = parseInt(countRes.rows[0]?.count || '0', 10);
+
+    const itemsRes = await query(
+      `SELECT
+         o.id,
+         o.order_number,
+         o.total_amount,
+         o.status,
+         o.payment_status,
+         o.payment_method,
+         o.created_at,
+         v.business_name AS vendor_name,
+         u.first_name AS customer_first_name,
+         u.last_name AS customer_last_name
+       FROM order_management.orders o
+       JOIN vendor.vendors v ON v.id = o.vendor_id
+       JOIN identity.users u ON u.id = o.customer_id
+       WHERE ${whereClause}
+       ORDER BY o.created_at DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset]
+    );
+
+    return {
+      items: itemsRes.rows.map((row) => ({
+        id: row.id,
+        orderNumber: row.order_number,
+        totalAmount: parseFloat(row.total_amount || '0'),
+        status: row.status,
+        paymentStatus: row.payment_status,
+        paymentMethod: row.payment_method,
+        createdAt: row.created_at,
+        vendorName: row.vendor_name,
+        customerName: `${row.customer_first_name} ${row.customer_last_name}`.trim(),
+      })),
+      total,
+      page,
+      limit,
+    };
+  }
 }
+

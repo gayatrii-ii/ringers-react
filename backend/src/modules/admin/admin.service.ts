@@ -420,15 +420,15 @@ export class AdminService {
   }
 
   /**
-   * Super Admin: Platform Metrics Overview
+   * Super Admin: Platform Metrics Overview (Enriched with Orders, GMV, and Payments)
    */
   public static async getPlatformMetrics() {
-    const [vendorsCount, productsCount, usersCount, pendingVendorReqs, pendingDeliveryReqs] = await Promise.all([
+    const [vendorsCount, productsCount, usersCount, pendingVendorReqs, pendingDeliveryReqs, orderMetricsRes, paymentMetricsRes] = await Promise.all([
       query<{ status: string; count: string }>(
-        `SELECT status, COUNT(*)::text as count FROM vendor.vendors GROUP BY status`
+        `SELECT status, COUNT(*)::text as count FROM vendor.vendors WHERE deleted_at IS NULL GROUP BY status`
       ),
       query<{ status: string; count: string }>(
-        `SELECT status, COUNT(*)::text as count FROM catalog.products GROUP BY status`
+        `SELECT status, COUNT(*)::text as count FROM catalog.products WHERE deleted_at IS NULL GROUP BY status`
       ),
       query<{ code: string; count: string }>(
         `SELECT r.code, COUNT(ur.user_id)::text as count
@@ -442,14 +442,200 @@ export class AdminService {
       query<{ count: string }>(
         `SELECT COUNT(*)::text as count FROM delivery.delivery_boy_job_requests WHERE status = 'PENDING'`
       ),
+      query<{ total_orders: string; total_gmv: string; completed_orders: string; cancelled_orders: string }>(
+        `SELECT 
+           COUNT(*)::text as total_orders,
+           COALESCE(SUM(total_amount), 0)::text as total_gmv,
+           COUNT(*) FILTER (WHERE status = 'DELIVERED')::text as completed_orders,
+           COUNT(*) FILTER (WHERE status = 'CANCELLED')::text as cancelled_orders
+         FROM order_management.orders`
+      ),
+      query<{ payment_method: string; count: string; volume: string }>(
+        `SELECT payment_method, COUNT(*)::text as count, COALESCE(SUM(total_amount), 0)::text as volume
+         FROM order_management.orders
+         GROUP BY payment_method`
+      ),
     ]);
+
+    const orderStats = orderMetricsRes.rows[0];
 
     return {
       vendors: vendorsCount.rows,
       products: productsCount.rows,
       roles: usersCount.rows,
+      totalOrders: parseInt(orderStats?.total_orders || '0', 10),
+      totalGmv: parseFloat(orderStats?.total_gmv || '0'),
+      completedOrders: parseInt(orderStats?.completed_orders || '0', 10),
+      cancelledOrders: parseInt(orderStats?.cancelled_orders || '0', 10),
+      paymentBreakdown: paymentMetricsRes.rows.map((r) => ({
+        method: r.payment_method,
+        count: parseInt(r.count, 10),
+        volume: parseFloat(r.volume),
+      })),
       pendingVendorRequests: parseInt(pendingVendorReqs.rows[0]?.count || '0', 10),
       pendingDeliveryRequests: parseInt(pendingDeliveryReqs.rows[0]?.count || '0', 10),
     };
   }
+
+  /**
+   * Super Admin: Update Customer Account Status (ACTIVE / SUSPENDED)
+   */
+  public static async updateCustomerStatus(
+    customerId: string,
+    status: 'ACTIVE' | 'SUSPENDED'
+  ): Promise<{ customerId: string; status: string; message: string }> {
+    const userRes = await query<{ id: string }>(
+      `SELECT u.id FROM identity.users u
+       JOIN identity.user_roles ur ON ur.user_id = u.id
+       JOIN identity.roles r ON r.id = ur.role_id AND r.code = 'CUSTOMER'
+       WHERE u.id = $1`,
+      [customerId]
+    );
+
+    if (userRes.rows.length === 0) {
+      throw new AppError('Customer not found.', 404, 'CUSTOMER_NOT_FOUND');
+    }
+
+    await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE identity.users SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [status, customerId]
+      );
+
+      // If suspended, revoke refresh tokens
+      if (status === 'SUSPENDED') {
+        await client.query(
+          `UPDATE identity.refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND revoked_at IS NULL`,
+          [customerId]
+        );
+      }
+    });
+
+    return {
+      customerId,
+      status,
+      message: `Customer account status updated to ${status} successfully.`,
+    };
+  }
+
+  /**
+   * Super Admin: List all vendors with status filter and search
+   */
+  public static async listAdminVendors(options: {
+    status?: string;
+    search?: string;
+    city?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ vendors: any[]; total: number; page: number; limit: number }> {
+    const page = options.page || 1;
+    const limit = options.limit || 20;
+    const offset = (page - 1) * limit;
+
+    const conditions: string[] = ['v.deleted_at IS NULL'];
+    const params: unknown[] = [];
+    let pIdx = 1;
+
+    if (options.status) {
+      conditions.push(`v.status = $${pIdx++}`);
+      params.push(options.status);
+    }
+
+    if (options.city) {
+      conditions.push(`EXISTS (SELECT 1 FROM vendor.vendor_addresses va WHERE va.vendor_id = v.id AND va.city ILIKE $${pIdx++})`);
+      params.push(`%${options.city}%`);
+    }
+
+    if (options.search) {
+      conditions.push(`(v.business_name ILIKE $${pIdx} OR u.phone ILIKE $${pIdx} OR u.email ILIKE $${pIdx})`);
+      params.push(`%${options.search}%`);
+      pIdx++;
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    const countRes = await query<{ count: string }>(
+      `SELECT COUNT(*)::text as count
+       FROM vendor.vendors v
+       JOIN identity.users u ON u.id = v.owner_user_id
+       WHERE ${whereClause}`,
+      params
+    );
+    const total = parseInt(countRes.rows[0]?.count || '0', 10);
+
+    const res = await query(
+      `SELECT v.id, v.business_name, v.description, v.status, v.phone, v.email,
+              v.rating, v.total_reviews, v.restrict_customer_catalog, v.referral_code,
+              u.first_name as owner_first_name, u.last_name as owner_last_name,
+              u.phone as owner_phone, u.email as owner_email,
+              v.created_at, v.updated_at
+       FROM vendor.vendors v
+       JOIN identity.users u ON u.id = v.owner_user_id
+       WHERE ${whereClause}
+       ORDER BY v.created_at DESC
+       LIMIT $${pIdx++} OFFSET $${pIdx++}`,
+      [...params, limit, offset]
+    );
+
+    return { vendors: res.rows, total, page, limit };
+  }
+
+  /**
+   * Public: Check Vendor Registration Request Status
+   */
+  public static async getPublicVendorRequestStatus(mobile: string) {
+    const res = await query<{
+      id: string;
+      business_name: string;
+      status: string;
+      rejection_reason: string | null;
+      key_code: string | null;
+      created_at: Date;
+    }>(
+      `SELECT vrr.id, vrr.business_name, vrr.status, vrr.rejection_reason,
+              vpk.key_code, vrr.created_at
+       FROM identity.vendor_registration_requests vrr
+       LEFT JOIN identity.vendor_private_keys vpk ON vpk.id = vrr.generated_key_id
+       WHERE vrr.mobile = $1
+       ORDER BY vrr.created_at DESC
+       LIMIT 1`,
+      [mobile.trim()]
+    );
+
+    if (res.rows.length === 0) {
+      throw new AppError('No application found for this mobile number.', 404, 'APPLICATION_NOT_FOUND');
+    }
+
+    return res.rows[0];
+  }
+
+  /**
+   * Public: Check Delivery Boy Job Request Status
+   */
+  public static async getPublicDeliveryJobRequestStatus(mobile: string) {
+    const res = await query<{
+      id: string;
+      full_name: string;
+      status: string;
+      assigned_vendor_id: string | null;
+      vendor_name: string | null;
+      created_at: Date;
+    }>(
+      `SELECT jr.id, jr.full_name, jr.status, jr.assigned_vendor_id,
+              v.business_name as vendor_name, jr.created_at
+       FROM delivery.delivery_boy_job_requests jr
+       LEFT JOIN vendor.vendors v ON v.id = jr.assigned_vendor_id
+       WHERE jr.mobile = $1
+       ORDER BY jr.created_at DESC
+       LIMIT 1`,
+      [mobile.trim()]
+    );
+
+    if (res.rows.length === 0) {
+      throw new AppError('No job application found for this mobile number.', 404, 'APPLICATION_NOT_FOUND');
+    }
+
+    return res.rows[0];
+  }
 }
+

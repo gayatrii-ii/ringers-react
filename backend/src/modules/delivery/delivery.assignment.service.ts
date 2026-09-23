@@ -39,7 +39,21 @@ export interface TrackingResponse {
     accuracy: number | null;
     recordedAt: Date;
   } | null;
+  customer: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    profilePhotoUrl: string | null;
+  } | null;
+  deliveryAddress: any;
+  vendorLocation: {
+    latitude: number;
+    longitude: number;
+  } | null;
+  googleMapsNavigationUrl: string | null;
 }
+
 
 export class DeliveryAssignmentService {
   /**
@@ -216,6 +230,209 @@ export class DeliveryAssignmentService {
       };
     });
   }
+
+  /**
+   * Vendor reassigns delivery boy for an order
+   */
+  public static async reassignRiderToOrder(
+    orderId: string,
+    assignerUserId: string,
+    _assignerRoles: RoleCode[],
+    newRiderId: string,
+    reason?: string
+  ): Promise<AssignmentRecord> {
+    return await withTransaction(async (client) => {
+      // 1. Fetch order and vendor ownership
+      const orderRes = await client.query<{
+        id: string;
+        order_number: string;
+        vendor_id: string;
+        customer_id: string;
+        status: string;
+        delivery_status: string;
+        owner_user_id: string;
+        business_name: string;
+      }>(
+        `SELECT o.id, o.order_number, o.vendor_id, o.customer_id, o.status, o.delivery_status,
+                v.owner_user_id, v.business_name
+         FROM order_management.orders o
+         JOIN vendor.vendors v ON v.id = o.vendor_id
+         WHERE o.id = $1 FOR UPDATE`,
+        [orderId]
+      );
+
+      if (orderRes.rows.length === 0 || !orderRes.rows[0]) {
+        throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
+      }
+
+      const order = orderRes.rows[0];
+
+      if (order.owner_user_id !== assignerUserId) {
+        throw new AppError(
+          'Only the vendor owning this store can reassign a delivery partner to this order.',
+          403,
+          'VENDOR_ONLY_ACTION'
+        );
+      }
+
+      // Check if order is already delivered or cancelled
+      if (['DELIVERED', 'CANCELLED'].includes(order.status)) {
+        throw new AppError(
+          `Cannot reassign delivery partner when order is ${order.status}.`,
+          400,
+          'INVALID_ORDER_STATE'
+        );
+      }
+
+      // 2. Fetch existing active assignment
+      const activeAssignRes = await client.query<{
+        id: string;
+        delivery_boy_id: string;
+        status: string;
+      }>(
+        `SELECT id, delivery_boy_id, status FROM delivery.delivery_assignments 
+         WHERE order_id = $1 AND status IN ('ASSIGNED', 'ACCEPTED', 'PICKED_UP') 
+         LIMIT 1`,
+        [orderId]
+      );
+
+      const oldAssignment = activeAssignRes.rows[0];
+
+      // Mark old assignment as REASSIGNED if exists
+      if (oldAssignment) {
+        await client.query(
+          `UPDATE delivery.delivery_assignments 
+           SET status = 'REASSIGNED', failure_reason = $1, updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $2`,
+          [reason || 'Reassigned by vendor', oldAssignment.id]
+        );
+
+        // Reset old rider duty status back to ONLINE if they were BUSY
+        await client.query(
+          `UPDATE delivery.delivery_profiles 
+           SET status = 'ONLINE', updated_at = CURRENT_TIMESTAMP 
+           WHERE user_id = $1 AND status = 'BUSY'`,
+          [oldAssignment.delivery_boy_id]
+        );
+
+        // Notify old rider
+        try {
+          await NotificationService.createNotification({
+            userId: oldAssignment.delivery_boy_id,
+            title: 'Delivery Reassigned',
+            message: `Order ${order.order_number} has been reassigned to another delivery partner.`,
+            type: 'SYSTEM',
+            referenceType: 'ORDER',
+            referenceId: orderId,
+          });
+        } catch (e) {
+          console.warn('Failed to notify previous rider of reassignment:', e);
+        }
+      }
+
+      // 3. Verify new rider exists, holds DELIVERY_BOY role, and is ONLINE
+      const newRiderRes = await client.query<{
+        id: string;
+        first_name: string;
+        last_name: string;
+        phone: string;
+        status: string;
+      }>(
+        `SELECT u.id, u.first_name, u.last_name, u.phone, COALESCE(dp.status, 'OFFLINE') as status
+         FROM identity.users u
+         JOIN identity.user_roles ur ON ur.user_id = u.id
+         JOIN identity.roles r ON r.id = ur.role_id AND r.code = 'DELIVERY_BOY'
+         LEFT JOIN delivery.delivery_profiles dp ON dp.user_id = u.id
+         WHERE u.id = $1 AND u.deleted_at IS NULL AND u.status = 'ACTIVE'`,
+        [newRiderId]
+      );
+
+      if (newRiderRes.rows.length === 0 || !newRiderRes.rows[0]) {
+        throw new AppError('New delivery partner account not found or is inactive.', 404, 'RIDER_NOT_FOUND');
+      }
+
+      const newRider = newRiderRes.rows[0];
+
+      if (newRider.status !== 'ONLINE') {
+        throw new AppError(
+          `Selected rider is currently ${newRider.status}. Only ONLINE riders can be assigned deliveries.`,
+          400,
+          'RIDER_NOT_AVAILABLE'
+        );
+      }
+
+      // 4. Create new assignment
+      const newAssignRes = await client.query<{
+        id: string;
+        order_id: string;
+        delivery_boy_id: string;
+        status: string;
+        assigned_at: Date;
+      }>(
+        `INSERT INTO delivery.delivery_assignments (order_id, delivery_boy_id, status)
+         VALUES ($1, $2, 'ASSIGNED')
+         RETURNING id, order_id, delivery_boy_id, status, assigned_at`,
+        [orderId, newRiderId]
+      );
+
+      const assignment = newAssignRes.rows[0]!;
+
+      // 5. Update order delivery_status
+      await client.query(
+        `UPDATE order_management.orders 
+         SET delivery_status = 'ASSIGNED', updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $1`,
+        [orderId]
+      );
+
+      // 6. Record status history
+      await client.query(
+        `INSERT INTO order_management.order_status_history (order_id, old_status, new_status, changed_by, reason)
+         VALUES ($1, $2, $2, $3, $4)`,
+        [
+          orderId,
+          order.status,
+          assignerUserId,
+          `Reassigned to rider ${newRider.first_name} ${newRider.last_name} (${newRider.phone}). Reason: ${reason || 'Vendor re-assignment'}`,
+        ]
+      );
+
+      // 7. Real-time dispatch via Socket.IO
+      SocketEvents.emitAssignmentCreated(newRiderId, order.vendor_id, {
+        assignmentId: assignment.id,
+        orderId,
+        orderNumber: order.order_number,
+        vendorName: order.business_name,
+        assignedAt: assignment.assigned_at,
+      });
+
+      // 8. Send notification to new rider
+      try {
+        await NotificationService.createNotification({
+          userId: newRiderId,
+          title: 'New Delivery Assigned',
+          message: `You have been assigned order ${order.order_number} from ${order.business_name}.`,
+          type: 'SYSTEM',
+          referenceType: 'ORDER',
+          referenceId: orderId,
+        });
+      } catch (err) {
+        console.warn('Failed to send new rider assignment notification:', err);
+      }
+
+      return {
+        id: assignment.id,
+        orderId: assignment.order_id,
+        deliveryBoyId: assignment.delivery_boy_id,
+        status: assignment.status,
+        assignedAt: assignment.assigned_at,
+        acceptedAt: null,
+        pickedUpAt: null,
+        deliveredAt: null,
+      };
+    });
+  }
+
 
   /**
    * 2. Rider accepts assigned delivery
@@ -582,10 +799,17 @@ export class DeliveryAssignmentService {
         [order.assignment_id]
       );
 
-      // Mark order DELIVERED
+      // Mark order DELIVERED, and if Cash / COD, mark payment_status = 'PAID'
       await client.query(
         `UPDATE order_management.orders 
-         SET status = 'DELIVERED', delivery_status = 'DELIVERED', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+         SET status = 'DELIVERED',
+             delivery_status = 'DELIVERED',
+             payment_status = CASE 
+               WHEN payment_method IN ('CASH_ON_DELIVERY', 'CASH') AND payment_status != 'PAID' THEN 'PAID' 
+               ELSE payment_status 
+             END,
+             completed_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP 
          WHERE id = $1`,
         [orderId]
       );
@@ -704,10 +928,17 @@ export class DeliveryAssignmentService {
         );
       }
 
-      // Update order to DELIVERED
+      // Update order to DELIVERED, and if Cash / COD, mark payment_status = 'PAID'
       await client.query(
         `UPDATE order_management.orders 
-         SET status = 'DELIVERED', delivery_status = 'DELIVERED', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+         SET status = 'DELIVERED',
+             delivery_status = 'DELIVERED',
+             payment_status = CASE 
+               WHEN payment_method IN ('CASH_ON_DELIVERY', 'CASH') AND payment_status != 'PAID' THEN 'PAID' 
+               ELSE payment_status 
+             END,
+             completed_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP 
          WHERE id = $1`,
         [orderId]
       );
@@ -997,24 +1228,76 @@ export class DeliveryAssignmentService {
       }
     }
 
-      return {
-        orderId: order.id,
-        orderNumber: order.order_number,
-        orderStatus: order.status,
-        deliveryStatus: order.delivery_status,
-        deliveryBoy: assign
+    // Fetch order details including customer, addresses, and vendor location
+    const orderDetailsRes = await query<{
+      delivery_address: any;
+      vendor_latitude: string | null;
+      vendor_longitude: string | null;
+      customer_first_name: string;
+      customer_last_name: string;
+      customer_phone: string;
+      customer_photo_url: string | null;
+    }>(
+      `SELECT o.delivery_address,
+              va.latitude AS vendor_latitude,
+              va.longitude AS vendor_longitude,
+              u.first_name AS customer_first_name,
+              u.last_name AS customer_last_name,
+              u.phone AS customer_phone,
+              cp.profile_photo_url AS customer_photo_url
+       FROM order_management.orders o
+       JOIN identity.users u ON u.id = o.customer_id
+       LEFT JOIN customer.customer_profiles cp ON cp.user_id = u.id
+       LEFT JOIN vendor.vendor_addresses va ON va.vendor_id = o.vendor_id AND va.is_primary = true
+       WHERE o.id = $1`,
+      [orderId]
+    );
+
+    const orderDetails = orderDetailsRes.rows[0];
+    const destLat = orderDetails?.delivery_address?.latitude;
+    const destLon = orderDetails?.delivery_address?.longitude;
+
+    const googleMapsNavigationUrl =
+      destLat && destLon
+        ? `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLon}`
+        : null;
+
+    return {
+      orderId: order.id,
+      orderNumber: order.order_number,
+      orderStatus: order.status,
+      deliveryStatus: order.delivery_status,
+      deliveryBoy: assign
+        ? {
+            id: assign.delivery_boy_id,
+            firstName: assign.first_name,
+            lastName: assign.last_name,
+            phone: assign.phone,
+            vehicleType: assign.vehicle_type,
+            vehicleNumber: assign.vehicle_number,
+          }
+        : null,
+      latestLocation,
+      customer: orderDetails
+        ? {
+            id: order.customer_id,
+            firstName: orderDetails.customer_first_name,
+            lastName: orderDetails.customer_last_name,
+            phone: orderDetails.customer_phone,
+            profilePhotoUrl: orderDetails.customer_photo_url,
+          }
+        : null,
+      deliveryAddress: orderDetails?.delivery_address || null,
+      vendorLocation:
+        orderDetails?.vendor_latitude && orderDetails?.vendor_longitude
           ? {
-              id: assign.delivery_boy_id,
-              firstName: assign.first_name,
-              lastName: assign.last_name,
-              phone: assign.phone,
-              vehicleType: assign.vehicle_type,
-              vehicleNumber: assign.vehicle_number,
+              latitude: parseFloat(orderDetails.vendor_latitude),
+              longitude: parseFloat(orderDetails.vendor_longitude),
             }
           : null,
-        latestLocation,
-      };
-    }
+      googleMapsNavigationUrl,
+    };
+  }
 
   /**
    * Rider: List all delivery assignments and past delivery history

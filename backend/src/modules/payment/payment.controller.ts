@@ -217,12 +217,106 @@ export class PaymentController {
         throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
       }
 
-      const { orderId } = req.body;
-      const result = await WalletService.payOrderWithWallet(req.user.userId, orderId);
+      const { orderId, pin } = req.body;
+      const result = await WalletService.payOrderWithWallet(req.user.userId, orderId, pin);
 
       res.status(200).json({
         success: true,
         message: 'Order paid successfully using wallet balance',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/wallet/pin
+   */
+  public static async setWalletPin(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+      }
+
+      const { pin } = req.body;
+      const result = await WalletService.setWalletPin(req.user.userId, pin);
+
+      res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PATCH /api/v1/wallet/pin
+   */
+  public static async changeWalletPin(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+      }
+
+      const { oldPin, newPin } = req.body;
+      const result = await WalletService.changeWalletPin(req.user.userId, oldPin, newPin);
+
+      res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/payments/my-history
+   */
+  public static async getUnifiedPaymentHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+      }
+
+      const page = typeof req.query.page === 'number' ? req.query.page : parseInt(String(req.query.page || '1'), 10);
+      const limit = typeof req.query.limit === 'number' ? req.query.limit : parseInt(String(req.query.limit || '20'), 10);
+
+      const result = await WalletService.getUnifiedPaymentHistory(req.user.userId, { page, limit });
+
+      res.status(200).json({
+        success: true,
+        data: result.history,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: Math.ceil(result.total / result.limit),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/payments/refund-eligibility/:orderId
+   */
+  public static async checkRefundEligibility(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new AppError('Authentication required', 401, 'UNAUTHORIZED');
+      }
+
+      const { orderId } = req.params;
+      const isAdmin = req.user.roles.includes('SUPER_ADMIN') || req.user.roles.includes('ADMIN');
+
+      const result = await WalletService.checkRefundEligibility(String(orderId), req.user.userId, isAdmin);
+
+      res.status(200).json({
+        success: true,
         data: result,
       });
     } catch (error) {
@@ -259,3 +353,4 @@ export class PaymentController {
     }
   }
 }
+

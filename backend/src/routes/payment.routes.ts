@@ -12,6 +12,10 @@ import {
   walletTransactionQuerySchema,
   walletPaySchema,
   adminRefundSchema,
+  setWalletPinSchema,
+  changeWalletPinSchema,
+  unifiedPaymentHistoryQuerySchema,
+  refundEligibilityParamSchema,
 } from '../modules/payment/payment.validation.js';
 
 // ====================================================================
@@ -52,6 +56,24 @@ walletRouter.post(
   requireRoles(ROLES.CUSTOMER, ROLES.SUPER_ADMIN),
   validate(walletPaySchema),
   PaymentController.payWithWallet
+);
+
+// Set initial wallet 4-digit PIN (Customer)
+walletRouter.post(
+  '/pin',
+  authenticateToken,
+  requireRoles(ROLES.CUSTOMER, ROLES.SUPER_ADMIN),
+  validate(setWalletPinSchema),
+  PaymentController.setWalletPin
+);
+
+// Change wallet 4-digit PIN (Customer)
+walletRouter.patch(
+  '/pin',
+  authenticateToken,
+  requireRoles(ROLES.CUSTOMER, ROLES.SUPER_ADMIN),
+  validate(changeWalletPinSchema),
+  PaymentController.changeWalletPin
 );
 
 // Transaction ledger history (Customer, Vendor)
@@ -116,7 +138,27 @@ paymentRouter.post(
 );
 
 /**
- * 5. Mount wallet sub-router under /payments/wallet as well
+ * 5. Pre-flight refund eligibility check
+ */
+paymentRouter.get(
+  '/refund-eligibility/:orderId',
+  authenticateToken,
+  validate(refundEligibilityParamSchema),
+  PaymentController.checkRefundEligibility
+);
+
+/**
+ * 6. Unified customer payment history
+ */
+paymentRouter.get(
+  '/my-history',
+  authenticateToken,
+  validate(unifiedPaymentHistoryQuerySchema),
+  PaymentController.getUnifiedPaymentHistory
+);
+
+/**
+ * 7. Mount wallet sub-router under /payments/wallet as well
  */
 paymentRouter.use('/wallet', walletRouter);
 

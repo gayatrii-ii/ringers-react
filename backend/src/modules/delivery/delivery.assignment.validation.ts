@@ -10,6 +10,18 @@ export const assignDeliverySchema = z.object({
   }),
 });
 
+// ─── POST /orders/:id/reassign-delivery ───────────────────────────────────
+export const reassignDeliverySchema = z.object({
+  body: z.object({
+    riderId: z.string().uuid('Invalid delivery rider user ID format'),
+    reason: z.string().max(500).optional(),
+  }),
+  params: z.object({
+    id: z.string().uuid('Invalid order ID format'),
+  }),
+});
+
+
 // ─── POST /delivery/assignments/:id/reject ────────────────────────────────
 export const rejectAssignmentSchema = z.object({
   body: z.object({

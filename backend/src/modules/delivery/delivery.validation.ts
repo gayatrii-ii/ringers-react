@@ -42,3 +42,10 @@ export const adminUpdateRiderStatusSchema = z.object({
     notes: z.string().max(500).optional(),
   }),
 });
+
+export const updateDeliveryLanguageSchema = z.object({
+  body: z.object({
+    preferredLanguage: z.enum(['EN', 'HI', 'MR']),
+  }),
+});
+

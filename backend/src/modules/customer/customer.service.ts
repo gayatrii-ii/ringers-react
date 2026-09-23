@@ -47,9 +47,12 @@ export interface CustomerStatsResponse {
   activeOrders: number;
   completedOrders: number;
   cancelledOrders: number;
+  failedOrders: number;
   totalSpent: number;
+  lifetimeWalletSpent: number;
   walletBalance: number;
   savedAddressesCount: number;
+  paymentMethodsBreakdown: Array<{ method: string; count: number; totalAmount: number }>;
 }
 
 export interface CreateAddressInput {
@@ -293,6 +296,7 @@ export class CustomerService {
       active_orders: string;
       completed_orders: string;
       cancelled_orders: string;
+      failed_orders: string;
       total_spent: string;
     }>(
       `SELECT 
@@ -300,6 +304,7 @@ export class CustomerService {
          COUNT(*) FILTER (WHERE status IN ('PLACED', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY')) AS active_orders,
          COUNT(*) FILTER (WHERE status = 'DELIVERED') AS completed_orders,
          COUNT(*) FILTER (WHERE status = 'CANCELLED') AS cancelled_orders,
+         COUNT(*) FILTER (WHERE delivery_status = 'FAILED') AS failed_orders,
          COALESCE(SUM(total_amount) FILTER (WHERE status = 'DELIVERED'), 0) AS total_spent
        FROM order_management.orders
        WHERE customer_id = $1`,
@@ -308,9 +313,14 @@ export class CustomerService {
 
     const o = ordersRes.rows[0];
 
-    // Wallet balance
-    const walletRes = await query<{ balance: string }>(
-      `SELECT balance FROM payment.wallets WHERE user_id = $1`,
+    // Wallet balance and lifetime spend
+    const walletRes = await query<{ balance: string; lifetime_spent: string }>(
+      `SELECT w.balance,
+              COALESCE(SUM(wt.amount) FILTER (WHERE wt.transaction_type = 'DEBIT'), 0)::text AS lifetime_spent
+       FROM payment.wallets w
+       LEFT JOIN payment.wallet_transactions wt ON wt.wallet_id = w.id
+       WHERE w.user_id = $1
+       GROUP BY w.balance`,
       [userId]
     );
 
@@ -320,14 +330,30 @@ export class CustomerService {
       [userId]
     );
 
+    // Payment methods breakdown
+    const pmRes = await query<{ payment_method: string; count: string; total_amount: string }>(
+      `SELECT payment_method, COUNT(*)::text as count, COALESCE(SUM(total_amount), 0)::text as total_amount
+       FROM order_management.orders
+       WHERE customer_id = $1
+       GROUP BY payment_method`,
+      [userId]
+    );
+
     return {
       totalOrders: parseInt(o?.total_orders || '0', 10),
       activeOrders: parseInt(o?.active_orders || '0', 10),
       completedOrders: parseInt(o?.completed_orders || '0', 10),
       cancelledOrders: parseInt(o?.cancelled_orders || '0', 10),
+      failedOrders: parseInt(o?.failed_orders || '0', 10),
       totalSpent: parseFloat(o?.total_spent || '0'),
+      lifetimeWalletSpent: parseFloat(walletRes.rows[0]?.lifetime_spent || '0'),
       walletBalance: parseFloat(walletRes.rows[0]?.balance || '0'),
       savedAddressesCount: parseInt(addrRes.rows[0]?.count || '0', 10),
+      paymentMethodsBreakdown: pmRes.rows.map((r) => ({
+        method: r.payment_method,
+        count: parseInt(r.count, 10),
+        totalAmount: parseFloat(r.total_amount),
+      })),
     };
   }
 

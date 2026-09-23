@@ -58,3 +58,29 @@ export const publicDeliveryJobRequestSchema = z.object({
     drivingLicenseNumber: z.string().optional(),
   }),
 });
+
+export const updateCustomerStatusSchema = z.object({
+  params: z.object({
+    id: z.string().uuid('Valid customer UUID is required'),
+  }),
+  body: z.object({
+    status: z.enum(['ACTIVE', 'SUSPENDED']),
+  }),
+});
+
+export const adminVendorQuerySchema = z.object({
+  query: z.object({
+    status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'PENDING']).optional(),
+    search: z.string().optional(),
+    city: z.string().optional(),
+    page: z.string().transform((v) => Math.max(1, parseInt(v, 10) || 1)).default('1'),
+    limit: z.string().transform((v) => Math.min(100, Math.max(1, parseInt(v, 10) || 20))).default('20'),
+  }),
+});
+
+export const applicantRequestStatusQuerySchema = z.object({
+  query: z.object({
+    mobile: z.string().min(10, 'Mobile number is required'),
+  }),
+});
+
